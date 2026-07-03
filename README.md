@@ -1,45 +1,94 @@
 # Executive Job CRM
 
-AI-powered executive job intelligence pipeline built with **n8n**, **OpenAI**, **Gmail**, and **Google Sheets**.
-
 ## Overview
 
-Executive Job CRM automatically processes LinkedIn Job Alert emails, extracts job opportunities, evaluates executive-level fit using AI, and stores structured results in Google Sheets.
+**Executive Job CRM** is an AI-assisted workflow that automatically processes LinkedIn executive job alerts from Gmail, evaluates them using a **two-stage AI pipeline** plus **deterministic rules**, and stores structured opportunities in **Google Sheets**.
 
-The goal is to significantly reduce the manual effort required for executive job searching while maintaining high-quality recommendations.
+The project is implemented as **n8n workflow-as-code** (JSON exports + documentation), not a conventional application. Each job passes through extraction, Preview screening, policy gates, and Verified evaluation before a CRM row is appended with score, recommendation, CV, interview probability, and reject rationale.
 
-## Current Features
+The **Bulgaria (BG)** workflow is in production at v1.1.2. The **EMEA** workflow is under separate active development.
 
-- Gmail job alert processing
-- LinkedIn job extraction
-- AI-based executive fit scoring
-- Automatic location filtering
-- Automatic rejection workflow
-- Google Sheets integration
-- LinkedIn Job ID deduplication
+---
 
 ## Current Status
 
-🚧 Active development (v1.0 stabilization)
+| Track | Status |
+|-------|--------|
+| **Production workflow** | BG v1.1.2 — `workflows/Executive_Job_CRM_BG_v1.1.2_PRODUCTION.json` |
+| **BG dev working file** | `workflows/Executive_Job_CRM_v1.1_BG_ONLY.json` |
+| **Development** | EMEA workflow — `workflows/Executive-Job-CRM-v1.1-DEV.json` |
 
-The current focus is workflow stabilization, improved location extraction, and robust AI response handling before the first stable release.
+BG v1.1.2 is the frozen production baseline for Bulgaria-eligible roles (Sofia / Remote Bulgaria). EMEA work proceeds independently; BG calibration principles may be ported selectively.
 
-## Planned Improvements
+---
 
-- AI Location Engine
-- Two-stage AI scoring
-- Improved salary extraction
-- Company enrichment
-- Duplicate detection enhancements
+## Main Features
 
-## Technology Stack
+- **Gmail integration** — label-filtered job alert ingestion
+- **LinkedIn job extraction** — AI card extraction with subject fallback and digest skip
+- **Two-stage AI evaluation** — Preview (email card) and Verified (full posting)
+- **Executive Title Override** — routing for eligible executive titles
+- **Executive Scope Override** — organizational scope outweighs modest titles (Manager / Sr Manager)
+- **Commercial executive calibration** — GTM, pricing, partnerships, revenue scope
+- **Deterministic location policy** — BG eligibility enforced outside AI judgment
+- **CV recommendation** — COO, GTM, Strategy & Operations, AI Transformation, Program leadership
+- **Interview probability estimation** — aligned with final recommendation
+- **Google Sheets CRM** — searchable executive opportunity database
+- **Duplicate prevention** — JobId and composite dedupe keys
+- **Digest filtering** — skip LinkedIn carousel / similar-jobs emails
+- **Test mode** — `TestMode`, `TestLabel`, and isolated TEST-BG regression fetch
 
-- n8n
-- OpenAI
-- Gmail
-- Google Sheets
-- JavaScript
+---
 
-## License
+## Repository Structure
 
-MIT License
+```
+executive-ai-platform/
+├── workflows/          # n8n workflow JSON exports (runtime source of truth)
+├── docs/               # Architecture, calibration, and project rules
+├── README.md           # This file — project overview
+├── CHANGELOG.md        # Version history
+└── AGENTS.md           # Guidance for AI assistants (contributors)
+```
+
+**Key workflow files:**
+
+| File | Role |
+|------|------|
+| `Executive_Job_CRM_BG_v1.1.2_PRODUCTION.json` | BG production import |
+| `Executive_Job_CRM_v1.1_BG_ONLY.json` | BG development |
+| `Executive-Job-CRM-v1.1-DEV.json` | EMEA development |
+
+---
+
+## Documentation
+
+| Document | Purpose |
+|----------|---------|
+| [docs/BG_CALIBRATION_PRINCIPLES.md](docs/BG_CALIBRATION_PRINCIPLES.md) | Executive scoring principles for BG and EMEA porting |
+| [docs/BG_v1.1.2_RELEASE_NOTES.md](docs/BG_v1.1.2_RELEASE_NOTES.md) | BG v1.1.2 production release summary |
+| [docs/BG_WORKFLOW_ARCHITECTURE.md](docs/BG_WORKFLOW_ARCHITECTURE.md) | BG v1.1.2 technical architecture |
+| [CHANGELOG.md](CHANGELOG.md) | Project version history |
+
+Additional references: [docs/PROJECT_RULES.md](docs/PROJECT_RULES.md), [docs/architecture/WORKFLOW_ARCHITECTURE.md](docs/architecture/WORKFLOW_ARCHITECTURE.md), [AGENTS.md](AGENTS.md).
+
+---
+
+## Roadmap
+
+### Near-term
+
+- **EMEA workflow** — production-ready multi-country pipeline
+- **Shared calibration** — port BG principles where region-agnostic
+- **Parser improvements** — subject fallback and location edge cases
+
+### Long-term
+
+- **Target company discovery** — proactive company-level intake
+- **Executive outreach automation** — structured follow-up from CRM signals
+- **CRM enrichment** — extended fields and pipeline status
+- **AI market monitoring** — broader role and market trend awareness
+
+---
+
+*BG v1.1.2 in production · EMEA in development*
