@@ -1394,6 +1394,20 @@
       ],
       "id": "filter-digest-emails-emea-001",
       "name": "Filter Skip Digest Emails"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "// CRM append gate - only write rows with Company + Role, unless explicit debug mode.\nconst CRM_APPEND_DEBUG = false;\nconst asBool = (v) => v === true || v === 'true' || v === 1;\nconst hasText = (v) => String(v ?? '').trim() !== '';\nconst isDebugAppend = (j) =>\n  CRM_APPEND_DEBUG === true\n  || asBool(j.CrmAppendDebug)\n  || (asBool(j.TestMode) && hasText(j.TestLabelUsed));\nconst items = $input.all();\nconst passed = [];\nfor (const item of items) {\n  const j = item.json;\n  const company = String(j.Company ?? '').trim();\n  const role = String(j.Role ?? '').trim();\n  if ((company && role) || isDebugAppend(j)) passed.push(item);\n}\nreturn passed;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3312,
+        576
+      ],
+      "id": "gate-append-crm-emea-001",
+      "name": "Gate Append to CRM Sheet"
     }
   ],
   "pinData": {
@@ -1775,6 +1789,17 @@
       ]
     },
     "Merge Final Records": {
+      "main": [
+        [
+          {
+            "node": "Gate Append to CRM Sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gate Append to CRM Sheet": {
       "main": [
         [
           {
