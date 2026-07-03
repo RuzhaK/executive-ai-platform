@@ -3,7 +3,7 @@
   "nodes": [
     {
       "parameters": {
-        "jsCode": "const extractRawText = (item) =>\n  item.json.output?.[0]?.content?.[0]?.text ||\n  item.json.output?.[0]?.text ||\n  item.json.content?.[0]?.text ||\n  item.json.text ||\n  item.json.response ||\n  item.json.message ||\n  '';\n\nconst extractJobId = (url) =>\n  String(url || '').match(/jobs\\/view\\/(\\d+)/)?.[1] || '';\n\nconst locationAllowed = (location) => {\n  const loc = String(location || '').toLowerCase();\n\n  if (\n    loc.includes('remote europe') ||\n    loc.includes('remote emea') ||\n    loc.includes('emea · remote') ||\n    loc.includes('europe · remote') ||\n    loc.includes('remote worldwide') ||\n    loc.includes('remote global') ||\n    loc.includes('bulgaria')\n  ) {\n    return true;\n  }\n\n  return false;\n};\n\nconst looksFakeCompany = (company, role) => {\n  const c = String(company || '').toLowerCase().trim();\n  const r = String(role || '').toLowerCase().trim();\n\n  if (!c) return true;\n  if (c === r) return true;\n\n  const blockedExactCompanies = [\n    'remote',\n    'hybrid',\n    'onsite',\n    'on-site',\n    'on site',\n    'full-time',\n    'part-time',\n    'contract',\n    'temporary',\n    'internship'\n  ];\n\n  if (blockedExactCompanies.includes(c)) return true;\n\n  if (\n    c.includes('connections') ||\n    c.includes('install linkedin widgets') ||\n    c.includes('see all jobs') ||\n    c.includes('actively recruiting') ||\n    c.includes('actively reviewing applicants') ||\n    c.includes('fast growing') ||\n    c.includes('promoted by hirer') ||\n    c.includes('responses managed off linkedin')\n  ) return true;\n\n  const roleWords = [\n    'manager', 'director', 'head', 'chief', 'vp',\n    'operations', 'revenue', 'strategy', 'business',\n    'lead', 'program', 'product', 'commercial', 'revops'\n  ];\n\n  const companyLooksLikeRole = roleWords.some(w => c.includes(w));\n  if (companyLooksLikeRole) return true;\n\n  return false;\n};\n\nconst output = [];\nconst seen = new Set();\n\nfor (const item of $input.all()) {\n  const raw = extractRawText(item);\n\n  let clean = String(raw)\n    .replace(/```json/gi, '')\n    .replace(/```/g, '')\n    .trim();\n\n  const firstBracket = clean.indexOf('[');\n  const lastBracket = clean.lastIndexOf(']');\n\n  if (firstBracket !== -1 && lastBracket !== -1 && lastBracket > firstBracket) {\n    clean = clean.slice(firstBracket, lastBracket + 1);\n  }\n\n  let parsed;\n\n  try {\n    parsed = JSON.parse(clean);\n  } catch (e) {\n    continue;\n  }\n\n  const jobs = Array.isArray(parsed) ? parsed : (parsed.jobs || []);\n\n  for (const j of jobs) {\n    if (!j || !j.company || !j.role) continue;\n    if (looksFakeCompany(j.company, j.role)) continue;\n\n    const company = String(j.company || '').trim();\n    const role = String(j.role || '').trim();\n    const location = String(j.location || 'Not specified').trim();\n    const workType = String(j.work_type || '').trim();\n    const url = String(j.url || '').trim();\n    const jobId = extractJobId(url);\n    const dedupeKey = (jobId || `${company}|${role}|${location}`).toLowerCase();\n\n    if (!dedupeKey || dedupeKey === '||') continue;\n\n    if (seen.has(dedupeKey)) continue;\n    seen.add(dedupeKey);\n\n    const allowed = locationAllowed(location);\n\n    output.push({\n      json: {\n        Role: role,\n        Company: company,\n        JobId: jobId,\n        Location: location,\n        WorkType: workType,\n        URL: url,\n        LocationAllowed: allowed,\n        LocationRejectReason: allowed ? '' : (\n          location.toLowerCase().includes('not specified') || location.trim() === ''\n            ? 'Location not specified.'\n            : 'Country-specific or non-Bulgaria location rejected.'\n        ),\n        Source: 'LinkedIn',\n        Status: 'New',\n        Notes: '',\n        ParseError: '',\n        DedupeKey: dedupeKey\n      }\n    });\n  }\n}\n\nreturn output;"
+        "jsCode": "const extractRawText = (item) =>\n  item.json.output?.[0]?.content?.[0]?.text ||\n  item.json.output?.[0]?.text ||\n  item.json.content?.[0]?.text ||\n  item.json.text ||\n  item.json.response ||\n  item.json.message ||\n  '';\n\nconst extractJobId = (url) =>\n  String(url || '').match(/jobs\\/view\\/(\\d+)/)?.[1] || '';\n\nconst locationAllowed = (location, workType = '') => {\n  const loc = String(location || '').toLowerCase().trim();\n  const wt = String(workType || '').toLowerCase().trim();\n\n  if (/relocation|relocate\\s*required/.test(loc)) return false;\n\n  if (loc.includes('bulgaria')) return true;\n\n  if (\n    loc.includes('remote europe') ||\n    loc.includes('remote emea') ||\n    loc.includes('emea · remote') ||\n    loc.includes('europe · remote') ||\n    loc.includes('remote worldwide') ||\n    loc.includes('remote global')\n  ) {\n    return true;\n  }\n\n  const hasRemote = wt === 'remote' || /\\bremote\\b/.test(loc);\n  const hasHybrid = wt === 'hybrid' || /\\bhybrid\\b/.test(loc);\n  const hasOnsite =\n    wt === 'onsite' || wt === 'on-site' || /\\bon-?site\\b/.test(loc) || /\\bonsite\\b/.test(loc);\n\n  // Country-specific remote — pass early gate; verify after full job read\n  if (hasRemote && loc.includes('· remote')) return true;\n\n  // Unqualified remote — pass early gate\n  if (hasRemote && !hasHybrid && !hasOnsite) return true;\n\n  if (hasHybrid && !loc.includes('bulgaria')) return false;\n\n  if (hasOnsite && !loc.includes('bulgaria')) return false;\n\n  if (!hasRemote && !loc.includes('bulgaria')) {\n    const nonRemoteCountries = [\n      'united kingdom', 'netherlands', 'spain', 'france', 'italy',\n      'germany', 'portugal', 'switzerland', 'united states',\n    ];\n    if (nonRemoteCountries.some((c) => loc.includes(c))) return false;\n  }\n\n  return true;\n};\n\nconst locationRejectReason = (location, workType, allowed) => {\n  if (allowed) return '';\n  const loc = String(location || '').toLowerCase().trim();\n  const wt = String(workType || '').toLowerCase().trim();\n  if (/relocation|relocate\\s*required/.test(loc)) return 'Relocation required.';\n  if ((/\\bhybrid\\b/.test(loc) || wt === 'hybrid') && !loc.includes('bulgaria')) {\n    return 'Hybrid outside Bulgaria rejected.';\n  }\n  if ((/\\bon-?site\\b/.test(loc) || /\\bonsite\\b/.test(loc) || wt === 'onsite') && !loc.includes('bulgaria')) {\n    return 'On-site outside Bulgaria rejected.';\n  }\n  return 'Non-remote location outside Bulgaria rejected.';\n};\n\nconst looksFakeCompany = (company, role) => {\n  const c = String(company || '').toLowerCase().trim();\n  const r = String(role || '').toLowerCase().trim();\n\n  if (!c) return true;\n  if (c === r) return true;\n\n  const blockedExactCompanies = [\n    'remote',\n    'hybrid',\n    'onsite',\n    'on-site',\n    'on site',\n    'full-time',\n    'part-time',\n    'contract',\n    'temporary',\n    'internship'\n  ];\n\n  if (blockedExactCompanies.includes(c)) return true;\n\n  if (\n    c.includes('connections') ||\n    c.includes('install linkedin widgets') ||\n    c.includes('see all jobs') ||\n    c.includes('actively recruiting') ||\n    c.includes('actively reviewing applicants') ||\n    c.includes('fast growing') ||\n    c.includes('promoted by hirer') ||\n    c.includes('responses managed off linkedin')\n  ) return true;\n\n  const roleWords = [\n    'manager', 'director', 'head', 'chief', 'vp',\n    'operations', 'revenue', 'strategy', 'business',\n    'lead', 'program', 'product', 'commercial', 'revops'\n  ];\n\n  const companyLooksLikeRole = roleWords.some(w => c.includes(w));\n  if (companyLooksLikeRole) return true;\n\n  return false;\n};\n\nconst emailMeta = $('Normalize Email Content').first().json;\nconst emailFields = {\n  EmailId: emailMeta.EmailId || '',\n  ThreadId: emailMeta.ThreadId || '',\n  EmailReceived: emailMeta.EmailReceived || '',\n  EmailSubject: emailMeta.EmailSubject || '',\n  EmailSnippet: emailMeta.EmailSnippet || '',\n};\n\nconst inferWorkType = (text) => {\n  const t = String(text || '').toLowerCase();\n  if (/\\bremote\\b/.test(t)) return 'Remote';\n  if (/\\bhybrid\\b/.test(t)) return 'Hybrid';\n  if (/\\b(on-?site|on site)\\b/.test(t)) return 'Onsite';\n  return '';\n};\n\nconst parseLocationFromText = (text) => {\n  const t = String(text || '');\n  const lower = t.toLowerCase();\n  const workType = inferWorkType(t);\n\n  if (/remote europe/.test(lower)) return 'Remote Europe';\n  if (/remote emea/.test(lower)) return 'Remote EMEA';\n  if (/remote worldwide|remote global/.test(lower)) return 'Remote Worldwide';\n\n  const countries = [\n    ['bulgaria', 'Bulgaria'],\n    ['united kingdom', 'United Kingdom'],\n    ['portugal', 'Portugal'],\n    ['italy', 'Italy'],\n    ['france', 'France'],\n    ['switzerland', 'Switzerland'],\n    ['netherlands', 'Netherlands'],\n    ['germany', 'Germany'],\n    ['spain', 'Spain'],\n    ['united states', 'United States'],\n  ];\n\n  for (const [needle, label] of countries) {\n    if (lower.includes(needle)) {\n      return workType ? `${label} · ${workType}` : label;\n    }\n  }\n\n  return 'Not specified';\n};\n\nconst buildDeterministicJobs = (content) => {\n  const hints = content.JobUrlHints || [];\n  const subjectHint = content.SubjectJobHint || {};\n  const jobs = [];\n\n  const skipLine = (line, role) =>\n    !line ||\n    line === role ||\n    /^(apply|save|easy apply|full-time|part-time|promoted|similar jobs|view job|see all jobs)$/i.test(line) ||\n    /^(remote|hybrid|on-?site|on site)$/i.test(line) ||\n    /^\\d+ (connection|mutual)/i.test(line);\n\n  for (const hint of hints) {\n    const url = String(hint.url || '').trim();\n    if (!url) continue;\n\n    const role = String(hint.anchorText || subjectHint.role || '').trim();\n    const contextLines = String(hint.context || '')\n      .split('\\n')\n      .map((l) => l.trim())\n      .filter(Boolean);\n\n    let company = '';\n    if (hints.length === 1 && subjectHint.company) {\n      company = String(subjectHint.company).trim();\n    }\n    if (!company) {\n      company = contextLines.find((l) => !skipLine(l, role) && l.length <= 80) || '';\n    }\n\n    if (!company || !role) continue;\n\n    jobs.push({\n      company,\n      role,\n      location: parseLocationFromText(hint.context),\n      work_type: inferWorkType(hint.context),\n      url,\n    });\n  }\n\n  if (jobs.length === 0 && hints.length === 1 && subjectHint.company && subjectHint.role) {\n    jobs.push({\n      company: String(subjectHint.company).trim(),\n      role: String(subjectHint.role).trim(),\n      location: parseLocationFromText(content.EmailText || ''),\n      work_type: inferWorkType(content.EmailText || ''),\n      url: String(hints[0].url || '').trim(),\n    });\n  }\n\n  return jobs;\n};\n\nconst buildFallbackItem = (extractionError = 'AI Extract returned []') => ({\n  json: {\n    ...emailFields,\n    Source: 'LinkedIn Email',\n    Status: 'Rejected',\n    Apply: 'NO',\n    Recommendation: 'NO',\n    Apply: 'NO',\n    Reason: 'AI Extract returned no job cards',\n    RejectReason: 'AI Extract returned no job cards',\n    MainRisk: 'No job card parsed from email',\n    Risk: 'No job card parsed from email',\n    Role: '',\n    Company: '',\n    Location: '',\n    URL: '',\n    JobUrl: '',\n    JobId: '',\n    WorkType: '',\n    DedupeKey: emailFields.EmailId || '',\n    ExtractionStatus: 'NO_JOB_CARD',\n    ExtractionError: extractionError,\n    PipelineStage: 'NO_JOB_CARD',\n    LocationAllowed: true,\n    LocationRejectReason: 'AI Extract returned no job cards',\n    Notes: '',\n    ParseError: '',\n  },\n});\n\nconst output = [];\nconst seen = new Set();\n\nfor (const item of $input.all()) {\n  const raw = extractRawText(item);\n\n  let clean = String(raw)\n    .replace(/```json/gi, '')\n    .replace(/```/g, '')\n    .trim();\n\n  const firstBracket = clean.indexOf('[');\n  const lastBracket = clean.lastIndexOf(']');\n\n  if (firstBracket !== -1 && lastBracket !== -1 && lastBracket > firstBracket) {\n    clean = clean.slice(firstBracket, lastBracket + 1);\n  }\n\n  let parsed;\n\n  try {\n    parsed = JSON.parse(clean);\n  } catch (e) {\n    return [buildFallbackItem('AI Extract returned invalid JSON')];\n  }\n\n  const jobs = Array.isArray(parsed) ? parsed : (parsed.jobs || []);\n\n  let jobList = jobs;\n  if (jobList.length === 0) {\n    const content = $('Normalize Email Content').first().json || {};\n    jobList = buildDeterministicJobs(content);\n    if (jobList.length === 0) {\n      return [buildFallbackItem()];\n    }\n  }\n\n  for (const j of jobList) {\n    if (!j || !j.company || !j.role) continue;\n    if (looksFakeCompany(j.company, j.role)) continue;\n\n    const company = String(j.company || '').trim();\n    const role = String(j.role || '').trim();\n    const location = String(j.location || 'Not specified').trim();\n    const workType = String(j.work_type || '').trim();\n    const url = String(j.url || '').trim();\n    const jobId = extractJobId(url);\n    const dedupeKey = (jobId || `${company}|${role}|${location}`).toLowerCase();\n\n    if (!dedupeKey || dedupeKey === '||') continue;\n\n    if (seen.has(dedupeKey)) continue;\n    seen.add(dedupeKey);\n\n    const allowed = locationAllowed(location, workType);\n\n    output.push({\n      json: {\n        ...emailFields,\n        Role: role,\n        Company: company,\n        JobId: jobId,\n        Location: location,\n        WorkType: workType,\n        URL: url,\n        LocationAllowed: allowed,\n        LocationRejectReason: locationRejectReason(location, workType, allowed),\n        Source: 'LinkedIn',\n        Status: 'New',\n        Notes: '',\n        ParseError: '',\n        DedupeKey: dedupeKey\n      }\n    });\n  }\n}\n\nreturn output;"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -13,6 +13,132 @@
       ],
       "id": "d6d22ceb-015c-4895-b51b-6351a5cfe27c",
       "name": "Parse Job Cards"
+    },
+    {
+      "parameters": {
+        "jsCode": "// DEV-ONLY: set to true to inject a low-fit mock job and bypass Gmail parse output.\n// Must remain false for normal DEV/production runs.\nconst DEV_TEST_MODE_ENABLED = false;\n\nif (!DEV_TEST_MODE_ENABLED) {\n  return $input.all();\n}\n\nreturn [\n  {\n    json: {\n      EmailId: 'test-low-fit-email',\n      ThreadId: 'test-low-fit-thread',\n      EmailReceived: String(Date.now()),\n      EmailSubject: 'TEST low fit job',\n      EmailSnippet: 'Entry-level customer support role in the United States, on-site.',\n      Role: 'Junior Customer Support Agent',\n      Company: 'Test Company',\n      Location: 'United States · On-site',\n      URL: 'https://example.com/test-job',\n      JobUrl: 'https://example.com/test-job',\n      JobId: '',\n      WorkType: 'Onsite',\n      Source: 'TEST',\n      Status: 'New',\n      Notes: '',\n      ParseError: '',\n      DedupeKey: 'test-low-fit-job',\n      LocationAllowed: false,\n      LocationRejectReason: 'Country-specific or non-Bulgaria location rejected.',\n      DevTestMode: true,\n      DevTestCase: 'LOW_PREVIEW_SCORE',\n    },\n  },\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1208,
+        640
+      ],
+      "id": "e6f7a8b9-c0d1-2345-ef01-devtestinj01",
+      "name": "DEV - Inject Low Preview Test Job"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const url = String($json.URL || '').trim();\n\nreturn {\n  json: {\n    ...$json,\n    HardReject: false,\n    RejectReason: '',\n    NeedsEnrichment: url.includes('/jobs/view/'),\n    PolicyVersion: '1.1',\n    PipelineStage: $json.ExtractionStatus === 'NO_JOB_CARD' ? 'NO_JOB_CARD' : ($json.HardReject === true ? 'POLICY_REJECT' : ''),\n  },\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1264,
+        640
+      ],
+      "id": "f3a8c2e1-9b4d-4f7a-8e6c-1d2policy01",
+      "name": "Policy Engine"
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "gpt-4.1-mini",
+          "mode": "list",
+          "cachedResultName": "GPT-4.1-MINI"
+        },
+        "responses": {
+          "values": [
+            {
+              "content": "=You are Stage 1 Preview AI for executive job triage.\n\nYou evaluate ONLY the email job card. You do NOT have the full LinkedIn job posting.\nYour job: decide whether this opportunity is worth opening the full job posting for deeper evaluation.\n\nEVALUATE ONLY:\n- Role fit (executive operations, COO, MD, VP Operations, Strategy & Operations, transformation, commercial ops)\n- Seniority fit (executive vs mid-level vs junior)\n- Company attractiveness (when inferable from company name or snippet)\n- Functional fit (operations, transformation, P&L, multi-country leadership)\n- Likely best CV\n- Overall potential / worth full review\n\nDO NOT CONCLUDE OR USE AS PRIMARY REJECTION REASONS:\n- UK Remote not acceptable / Spain Remote not acceptable / Netherlands Remote not acceptable\n- Bulgaria allowed or not allowed\n- Work authorization required\n- Country-specific remote rejected or accepted\n- Relocation required or not\n- Remote Europe / Remote EMEA / Worldwide eligibility\n- UK residents only\n\nThose decisions belong ONLY to Full Evaluation AFTER the LinkedIn job posting is opened.\n\nLOCATION RULES (critical):\n- Location is supporting context only — NEVER the primary rejection driver.\n- If location is ambiguous country · Remote (e.g. United Kingdom · Remote, Spain · Remote, Netherlands · Remote, France · Remote, Italy · Remote), treat location eligibility as UNKNOWN.\n- You may reduce preview_score by at most 1 point for ambiguous location uncertainty — never more than 1 point solely because of location.\n- preview_reason and preview_risk must focus on role, seniority, function, and company — NOT location eligibility.\n- Do not write preview_reason or preview_risk that rejects based on country-specific remote rules.\n\nCandidate profile (for role/seniority/function fit only):\n- 15+ years executive leadership (COO, MD, VP Operations, Strategy & Operations)\n- Strongest in operations, transformation, commercial leadership, multi-country P&L\n- Weak role/domain fit: hospitality GM, clinical/medical regulatory, deep technical engineering, gaming specialist, junior/support roles\n\nScore preview_score 1-10 based primarily on ROLE + SENIORITY + EXECUTIVE SCOPE (be conservative and consistent):\n- 8-10: ONLY for clear C-level / VP / GM / Business Unit Leader roles with strong executive scope (P&L, multi-country ops, transformation leadership)\n- 7: promising but uncertain senior roles worth opening full posting\n- 5-6: monitor roles with partial fit\n- 1-4: weak fit, junior, mid-level, support, or non-executive roles\n\npreview_recommendation (must align with preview_score):\n- YES = worth opening full job posting — ONLY when preview_score >= 7\n- MONITOR = partial fit — when preview_score is 5-6\n- NO = do not open — when preview_score is 4 or below\n\nOUTPUT VALUE STANDARDS (use exact strings only):\n- preview_recommendation: YES | MONITOR | NO\n\nNever return preview_recommendation YES when preview_score is below 7.\n\npreview_cv must be exactly one of:\n- COO CV\n- GTM & Commercial Operations CV\n- Strategy & Operations CV\n- AI Transformation CV\n- Project / Program Leadership CV\n\nReturn JSON only. No markdown.\n\n{\n  \"preview_score\": 0,\n  \"preview_recommendation\": \"\",\n  \"preview_reason\": \"\",\n  \"preview_risk\": \"\",\n  \"preview_cv\": \"\"\n}\n\nRole: {{$json.Role}}\nCompany: {{$json.Company}}\nLocation: {{$json.Location}}\nJobUrl: {{$json.URL}}\nEmailSubject: {{$json.EmailSubject}}\nEmailSnippet: {{$json.EmailSnippet}}\nSource: {{$json.Source}}"
+            }
+          ]
+        },
+        "builtInTools": {},
+        "options": {
+          "maxTokens": 400,
+          "temperature": 0
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 2.3,
+      "position": [
+        1376,
+        640
+      ],
+      "id": "a2b3c4d5-e6f7-8901-abcd-previewai01",
+      "name": "AI - Preview Score Job",
+      "credentials": {
+        "openAiApi": {
+          "id": "7dUCHr2ifwfK2pVa",
+          "name": "OpenAI account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// Preview gate threshold — change PreviewScoreThreshold here only (default 7).\n// PREVIEW STAGE FIELDS (email card only): PreviewScore, PreviewRecommendation, PreviewReason, PreviewRisk, PreviewCV\n// Do not write Score or VerifiedScore here.\nconst PreviewScoreThreshold = 7;\n\nconst base = $('Policy Engine').item?.json || {};\n\nconst allowedCvs = [\n  'COO CV',\n  'GTM & Commercial Operations CV',\n  'Strategy & Operations CV',\n  'AI Transformation CV',\n  'Project / Program Leadership CV',\n];\n\nconst normalizeCv = (cv) => {\n  const value = String(cv || '').trim();\n  return allowedCvs.includes(value) ? value : 'Strategy & Operations CV';\n};\n\nconst clampScore = (score) => {\n  const n = Number(score);\n  if (!Number.isFinite(n)) return 0;\n  return Math.max(0, Math.min(10, Math.round(n)));\n};\n\nconst looksLikeLocationDecision = (text) => {\n  const t = String(text || '').toLowerCase();\n  if (!t.trim()) return false;\n  return (\n    /remote not acceptable|not acceptable for|country-specific remote|country specific remote|work authorization|residents only|uk remote|united kingdom remote|spain remote|netherlands remote|france remote|italy remote|bulgaria allowed|non-bulgaria|location reject|relocation required|outside bulgaria/.test(t) &&\n    !/role|seniority|function|company|executive|coo|operations|transformation|junior|support/.test(t)\n  );\n};\n\nconst sanitizePreviewText = (text, fallback) => {\n  const value = String(text || '').trim();\n  if (!value) return fallback;\n  return looksLikeLocationDecision(value) ? fallback : value;\n};\n\nconst skipPreview =\n  base.ExtractionStatus === 'NO_JOB_CARD' ||\n  (!String(base.Role || '').trim() && !String(base.Company || '').trim());\n\nif (skipPreview) {\n  return {\n    json: {\n      ...base,\n      PreviewScore: 0,\n      PreviewRecommendation: 'NO',\n      PreviewReason: base.ExtractionError || base.RejectReason || 'No job card parsed from email',\n      PreviewRisk: base.MainRisk || 'No job card parsed from email',\n      PreviewCV: 'Strategy & Operations CV',\n      PreviewScoreThreshold,\n      PreviewPassesThreshold: false,\n      PipelineStage: 'NO_JOB_CARD',\n    },\n  };\n}\n\nconst raw =\n  $json.output?.[0]?.content?.[0]?.text ||\n  $json.output?.[0]?.text ||\n  $json.content?.[0]?.text ||\n  $json.text ||\n  '';\n\nconst clean = String(raw)\n  .replace(/```json/gi, '')\n  .replace(/```/g, '')\n  .trim();\n\nlet ai = {};\n\ntry {\n  ai = JSON.parse(clean);\n} catch (e) {\n  ai = {};\n}\n\nconst previewScore = clampScore(ai.preview_score);\nconst previewPassesThreshold = previewScore >= PreviewScoreThreshold;\n\nconst normalizePreviewRecommendation = (rec, score, threshold) => {\n  let value = String(rec || '').trim().toUpperCase();\n  if (!['YES', 'MONITOR', 'NO'].includes(value)) {\n    if (score >= threshold) value = 'YES';\n    else if (score >= 5) value = 'MONITOR';\n    else value = 'NO';\n  }\n  if (value === 'YES' && score < threshold) value = 'MONITOR';\n  return value;\n};\n\nconst previewRecommendation = normalizePreviewRecommendation(\n  ai.preview_recommendation,\n  previewScore,\n  PreviewScoreThreshold,\n);\n\nconst previewReason = sanitizePreviewText(\n  ai.preview_reason,\n  'Card-level role/seniority fit assessed; location eligibility deferred to full job read.',\n);\nconst previewRisk = sanitizePreviewText(\n  ai.preview_risk,\n  'Location eligibility unknown from email card; verify after full LinkedIn posting read.',\n);\n\nreturn {\n  json: {\n    ...base,\n    PreviewScore: previewScore,\n    PreviewRecommendation: previewRecommendation,\n    PreviewReason: previewReason,\n    PreviewRisk: previewRisk,\n    PreviewCV: normalizeCv(ai.preview_cv),\n    PreviewScoreThreshold,\n    PreviewPassesThreshold: previewPassesThreshold,\n  },\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1496,
+        640
+      ],
+      "id": "b3c4d5e6-f7a8-9012-bcde-previewjob01",
+      "name": "Preview Score Job"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "preview-threshold-pass-boolean",
+              "leftValue": "={{$json.PreviewPassesThreshold}}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1616,
+        640
+      ],
+      "id": "c4d5e6f7-a8b9-0123-cdef-previewif01",
+      "name": "Check Preview Threshold"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// Preview reject — keep Preview* intact; Verified* empty; Score mapped at Sheets only.\n// Runs ONLY on Check Preview Threshold FALSE branch (PreviewPassesThreshold === false).\nreturn {\n  json: {\n    ...$json,\n    Status: 'Rejected',\n    RejectReason: 'Preview score below threshold',\n    FinalDecision: 'REJECT_PREVIEW',\n    PipelineStage: $json.ExtractionStatus === 'NO_JOB_CARD' ? 'NO_JOB_CARD' : 'PREVIEW_REJECT',\n    VerifiedScore: '',\n    VerifiedRecommendation: '',\n    VerifiedRisk: '',\n    VerifiedWhyApply: '',\n    FinalCV: '',\n    VerifiedInterviewProbability: '',\n    VerifiedPriority: '',\n    SalaryEstimate: '',\n    SalaryTarget: '',\n    SalaryConfidence: '',\n    SalaryAssumption: '',\n    LocationFit: '',\n  },\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1616,
+        816
+      ],
+      "id": "d5e6f7a8-b9c0-1234-def0-previewrej01",
+      "name": "Build Preview Reject Record"
     },
     {
       "parameters": {
@@ -46,6 +172,193 @@
     },
     {
       "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "dev-gmail-test-mode",
+              "name": "TestMode",
+              "value": false,
+              "type": "boolean"
+            },
+            {
+              "id": "dev-gmail-test-email-id",
+              "name": "TestEmailId",
+              "value": "",
+              "type": "string"
+            },
+            {
+              "id": "dev-gmail-test-thread-id",
+              "name": "TestThreadId",
+              "value": "",
+              "type": "string"
+            },
+            {
+              "id": "dev-gmail-test-received-after",
+              "name": "TestReceivedAfter",
+              "value": "",
+              "type": "string"
+            },
+            {
+              "id": "dev-gmail-test-received-before",
+              "name": "TestReceivedBefore",
+              "value": "",
+              "type": "string"
+            },
+            {
+              "id": "dev-gmail-test-subject-contains",
+              "name": "TestSubjectContains",
+              "value": "",
+              "type": "string"
+            },
+            {
+              "id": "dev-gmail-test-max-results",
+              "name": "TestMaxResults",
+              "value": 1,
+              "type": "number"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        16,
+        640
+      ],
+      "id": "f1e2d3c4-b5a6-7890-gmail-devcfg01",
+      "name": "DEV Config - Gmail Input Selection",
+      "notesInFlow": true,
+      "notes": "DEV ONLY — Gmail input selection\n\nEdit fields here (no code changes):\n• TestMode=false → production behavior (label Jobs/LinkedIn, limit 1)\n• TestMode=true → deterministic test fetch\n\nPriority when TestMode=true:\n1. TestEmailId → exact message (limit 1)\n2. TestReceivedAfter and/or TestReceivedBefore → Gmail read by received date\n3. TestThreadId / TestSubjectContains → search\n4. Else → label read with TestMaxResults\n\nTestReceivedAfter/Before: ISO datetime e.g. 2026-06-01T00:00:00.000Z\nTestMaxResults: default 1 (applies to date-range and search reads)\n\nSet TestMode=false before normal runs."
+    },
+    {
+      "parameters": {
+        "jsCode": "const config = $input.first().json;\nconst LINKEDIN_LABEL_ID = 'Label_3053362597517296520';\n\nconst asBool = (v) => v === true || v === 'true' || v === 1;\nconst asString = (v) => (v === undefined || v === null ? '' : String(v).trim());\n\nif (!asBool(config.TestMode)) {\n  return [\n    {\n      json: {\n        fetchMode: 'production',\n        labelIds: [LINKEDIN_LABEL_ID],\n        limit: 1,\n      },\n    },\n  ];\n}\n\nconst testEmailId = asString(config.TestEmailId);\nconst testThreadId = asString(config.TestThreadId);\nconst testMax = Math.max(1, Number(config.TestMaxResults) || 1);\nconst subjectContains = asString(config.TestSubjectContains);\nconst receivedAfter = asString(config.TestReceivedAfter);\nconst receivedBefore = asString(config.TestReceivedBefore);\n\nif (testEmailId) {\n  return [\n    {\n      json: {\n        fetchMode: 'byEmailId',\n        messageId: testEmailId,\n        limit: 1,\n      },\n    },\n  ];\n}\n\nif (receivedAfter || receivedBefore) {\n  return [\n    {\n      json: {\n        fetchMode: 'byDateRange',\n        labelIds: [LINKEDIN_LABEL_ID],\n        limit: testMax,\n        receivedAfter,\n        receivedBefore,\n      },\n    },\n  ];\n}\n\nconst qParts = [];\nif (testThreadId) qParts.push(`threadId:${testThreadId}`);\nif (subjectContains) qParts.push(`subject:\"${subjectContains.replace(/\"/g, '')}\"`);\n\nreturn [\n  {\n    json: {\n      fetchMode: 'search',\n      labelIds: [LINKEDIN_LABEL_ID],\n      limit: testMax,\n      q: qParts.join(' ').trim(),\n    },\n  },\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        128,
+        640
+      ],
+      "id": "a2b3c4d5-e6f7-8901-gmail-fetchplan01",
+      "name": "Build Gmail Fetch Plan"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "fetch-mode-production",
+                    "leftValue": "={{ $json.fetchMode }}",
+                    "rightValue": "production",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "production"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "fetch-mode-by-email-id",
+                    "leftValue": "={{ $json.fetchMode }}",
+                    "rightValue": "byEmailId",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "byEmailId"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "fetch-mode-by-date-range",
+                    "leftValue": "={{ $json.fetchMode }}",
+                    "rightValue": "byDateRange",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "byDateRange"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "fetch-mode-search",
+                    "leftValue": "={{ $json.fetchMode }}",
+                    "rightValue": "search",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "search"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        240,
+        640
+      ],
+      "id": "b3c4d5e6-f7a8-9012-gmail-switch01",
+      "name": "Switch Gmail Fetch Mode"
+    },
+    {
+      "parameters": {
         "operation": "getAll",
         "limit": 1,
         "filters": {
@@ -57,8 +370,8 @@
       "type": "n8n-nodes-base.gmail",
       "typeVersion": 2.2,
       "position": [
-        128,
-        640
+        352,
+        528
       ],
       "id": "a81be781-6ddd-4094-800a-fa04e2d21329",
       "name": "Gmail - Read Job Alert Emails",
@@ -73,7 +386,7 @@
     {
       "parameters": {
         "operation": "get",
-        "messageId": "={{ $json.id }}",
+        "messageId": "={{ $json.messageId }}",
         "simple": false,
         "options": {}
       },
@@ -81,6 +394,91 @@
       "typeVersion": 2.2,
       "position": [
         352,
+        640
+      ],
+      "id": "c4d5e6f7-a8b9-0123-gmail-getid01",
+      "name": "Gmail - Get Email By ID (DEV)",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "8M7JlGbZTmC6zUYU",
+          "name": "Gmail OAuth2 API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "limit": "={{ $json.limit }}",
+        "filters": {
+          "labelIds": "={{ $json.labelIds }}",
+          "q": "={{ $json.q || '' }}"
+        }
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        352,
+        752
+      ],
+      "id": "d5e6f7a8-b9c0-1234-gmail-search01",
+      "name": "Gmail - Search Emails (DEV)",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "8M7JlGbZTmC6zUYU",
+          "name": "Gmail OAuth2 API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "limit": "={{ $json.limit }}",
+        "filters": {
+          "labelIds": "={{ $json.labelIds }}",
+          "receivedAfter": "={{ $json.receivedAfter || '' }}",
+          "receivedBefore": "={{ $json.receivedBefore || '' }}"
+        }
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        352,
+        864
+      ],
+      "id": "e6f7a8b9-c0d1-2345-gmail-daterange01",
+      "name": "Gmail - Read By Date Range (DEV)",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "8M7JlGbZTmC6zUYU",
+          "name": "Gmail OAuth2 API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const getHeader = (json, name) => {\n  const headers = json.payload?.headers || json.headers || [];\n  if (Array.isArray(headers)) {\n    const hit = headers.find(\n      (h) => String(h.name || h.key || '').toLowerCase() === name.toLowerCase(),\n    );\n    return hit?.value || hit?.headerValue || '';\n  }\n  if (headers && typeof headers === 'object') {\n    return headers[name] || headers[name.toLowerCase()] || '';\n  }\n  return '';\n};\n\nconst stripHtmlPreview = (html, maxLen = 300) => {\n  const text = String(html || '')\n    .replace(/<style[\\s\\S]*?<\\/style>/gi, ' ')\n    .replace(/<script[\\s\\S]*?<\\/script>/gi, ' ')\n    .replace(/<[^>]+>/g, ' ')\n    .replace(/&nbsp;/g, ' ')\n    .replace(/\\s+/g, ' ')\n    .trim();\n  return text.slice(0, maxLen);\n};\n\nconst firstNonEmpty = (...values) => {\n  for (const value of values) {\n    if (value !== undefined && value !== null && String(value).trim() !== '') {\n      return String(value).trim();\n    }\n  }\n  return '';\n};\n\nconst resolveEmailReceived = (json) =>\n  firstNonEmpty(\n    json.internalDate,\n    json.date,\n    json.receivedDate,\n    getHeader(json, 'Date'),\n  );\n\nconst resolveEmailSnippet = (json) => {\n  const preview = firstNonEmpty(\n    json.snippet,\n    json.textPlain,\n    stripHtmlPreview(json.textHtml || json.html || json.textAsHtml),\n    stripHtmlPreview(json.text || json.body),\n  );\n  return preview.length > 300 ? preview.slice(0, 300) : preview;\n};\n\nreturn {\n  json: {\n    ...$json,\n    EmailId: $json.id || '',\n    ThreadId: $json.threadId || '',\n    EmailReceived: resolveEmailReceived($json),\n    EmailSubject: $json.Subject || $json.subject || '',\n    EmailSnippet: resolveEmailSnippet($json),\n  },\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        464,
+        640
+      ],
+      "id": "b4e8f1a2-3c5d-4e6f-9a0b-emailmeta01",
+      "name": "Normalize Email Metadata"
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "messageId": "={{ $json.id }}",
+        "simple": false,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        576,
         640
       ],
       "id": "c140781f-b974-414e-b08e-3d62f0961323",
@@ -96,7 +494,7 @@
     {
       "parameters": {
         "mode": "runOnceForEachItem",
-        "jsCode": "const decodeHtml = (s) =>\n  (s || '')\n    .replace(/&nbsp;/g, ' ')\n    .replace(/&amp;/g, '&')\n    .replace(/&quot;/g, '\"')\n    .replace(/&#39;/g, \"'\");\n\nconst extractLinkedInJobUrls = (html) => {\n  const urls = html.match(/https:\\/\\/www\\.linkedin\\.com\\/comm\\/jobs\\/view\\/[^\"'<\\s]+/gi) || [];\n  const seen = new Set();\n\n  return urls\n    .map((u) => decodeHtml(u))\n    .filter((u) => {\n      const id = u.match(/jobs\\/view\\/(\\d+)/)?.[1] || '';\n      if (!id || seen.has(id)) return false;\n      seen.add(id);\n      return true;\n    });\n};\n\nconst cleanText = (html) =>\n  decodeHtml(html)\n    .replace(/<style[\\s\\S]*?<\\/style>/gi, ' ')\n    .replace(/<script[\\s\\S]*?<\\/script>/gi, ' ')\n    .replace(/<!--[\\s\\S]*?-->/g, ' ')\n    .replace(/<br\\s*\\/?>/gi, '\\n')\n    .replace(/<\\/p>/gi, '\\n')\n    .replace(/<\\/div>/gi, '\\n')\n    .replace(/<\\/li>/gi, '\\n')\n    .replace(/<\\/tr>/gi, '\\n')\n    .replace(/<\\/td>/gi, '\\n')\n    .replace(/<\\/h[1-6]>/gi, '\\n')\n    .replace(/<[^>]+>/g, ' ')\n    .replace(/\\n+/g, '\\n')\n    .replace(/[ \\t]+/g, ' ')\n    .split('\\n')\n    .map(x => x.trim())\n    .filter(Boolean)\n    .join('\\n')\n    .trim();\n\nconst subject = $json.subject || $json.Subject || '';\nconst html = $json.html || $json.textAsHtml || $json.text || '';\n\nconst urls = extractLinkedInJobUrls(html);\n\nreturn {\n  json: {\n    Subject: cleanText(subject),\n    EmailText: cleanText(html),\n    LinkedInJobUrls: urls,\n    LinkedInJobUrlsText: urls.join('\\n'),\n    Source: 'LinkedIn'\n  }\n};"
+        "jsCode": "const decodeHtml = (s) =>\n  (s || '')\n    .replace(/&nbsp;/g, ' ')\n    .replace(/&amp;/g, '&')\n    .replace(/&quot;/g, '\"')\n    .replace(/&#39;/g, \"'\");\n\nconst getHeader = (json, name) => {\n  const headers = json.payload?.headers || json.headers || [];\n  if (Array.isArray(headers)) {\n    const hit = headers.find(\n      (h) => String(h.name || h.key || '').toLowerCase() === name.toLowerCase(),\n    );\n    return hit?.value || hit?.headerValue || '';\n  }\n  if (headers && typeof headers === 'object') {\n    return headers[name] || headers[name.toLowerCase()] || '';\n  }\n  return '';\n};\n\nconst stripHtmlPreview = (html, maxLen = 300) => {\n  const text = String(html || '')\n    .replace(/<style[\\s\\S]*?<\\/style>/gi, ' ')\n    .replace(/<script[\\s\\S]*?<\\/script>/gi, ' ')\n    .replace(/<[^>]+>/g, ' ')\n    .replace(/&nbsp;/g, ' ')\n    .replace(/\\s+/g, ' ')\n    .trim();\n  return text.slice(0, maxLen);\n};\n\nconst firstNonEmpty = (...values) => {\n  for (const value of values) {\n    if (value !== undefined && value !== null && String(value).trim() !== '') {\n      return String(value).trim();\n    }\n  }\n  return '';\n};\n\nconst resolveEmailReceived = (json) =>\n  firstNonEmpty(\n    json.internalDate,\n    json.date,\n    json.receivedDate,\n    getHeader(json, 'Date'),\n  );\n\nconst resolveEmailSnippet = (json) => {\n  const preview = firstNonEmpty(\n    json.snippet,\n    json.textPlain,\n    stripHtmlPreview(json.textHtml || json.html || json.textAsHtml),\n    stripHtmlPreview(json.text || json.body),\n  );\n  return preview.length > 300 ? preview.slice(0, 300) : preview;\n};\n\nconst normalizeJobUrl = (raw) => {\n  const decoded = decodeHtml(String(raw || '')).trim();\n  const jobId = decoded.match(/linkedin\\.com(?:\\/comm)?\\/jobs\\/view\\/(\\d+)/i)?.[1];\n  return jobId ? `https://www.linkedin.com/jobs/view/${jobId}` : '';\n};\n\nconst cleanText = (html) =>\n  decodeHtml(html)\n    .replace(/<style[\\s\\S]*?<\\/style>/gi, ' ')\n    .replace(/<script[\\s\\S]*?<\\/script>/gi, ' ')\n    .replace(/<!--[\\s\\S]*?-->/g, ' ')\n    .replace(/<br\\s*\\/?>/gi, '\\n')\n    .replace(/<\\/p>/gi, '\\n')\n    .replace(/<\\/div>/gi, '\\n')\n    .replace(/<\\/li>/gi, '\\n')\n    .replace(/<\\/tr>/gi, '\\n')\n    .replace(/<\\/td>/gi, '\\n')\n    .replace(/<\\/h[1-6]>/gi, '\\n')\n    .replace(/<[^>]+>/g, ' ')\n    .replace(/\\n+/g, '\\n')\n    .replace(/[ \\t]+/g, ' ')\n    .split('\\n')\n    .map(x => x.trim())\n    .filter(Boolean)\n    .join('\\n')\n    .trim();\n\nconst extractLinkedInJobUrls = (html) => {\n  const matches =\n    String(html || '').match(\n      /https?:\\/\\/(?:[a-z0-9-]+\\.)*linkedin\\.com(?:\\/comm)?\\/jobs\\/view\\/\\d+[^\"'<\\s]*/gi,\n    ) || [];\n  const seen = new Set();\n\n  return matches\n    .map((u) => normalizeJobUrl(u))\n    .filter((u) => {\n      const id = u.match(/jobs\\/view\\/(\\d+)/)?.[1] || '';\n      if (!id || seen.has(id)) return false;\n      seen.add(id);\n      return true;\n    });\n};\n\nconst parseSubjectJobHint = (subject) => {\n  const s = decodeHtml(String(subject || '')).trim();\n  if (!s) return { company: '', role: '' };\n\n  const tail = s.includes(':') ? s.split(':').pop().trim() : s;\n  const posted = tail.match(/^(.+?)\\s+-\\s+(.+?)\\s+posted\\s+on\\b/i);\n  if (posted) {\n    return { company: posted[1].trim(), role: posted[2].trim() };\n  }\n\n  const dashed = tail.match(/^([^-]+?)\\s+-\\s+(.+)$/);\n  if (dashed) {\n    const company = dashed[1].trim();\n    const role = dashed[2].trim();\n    if (company && role && !/\\bor\\b/i.test(role) && role.length < 120) {\n      return { company, role };\n    }\n  }\n\n  return { company: '', role: '' };\n};\n\nconst extractAnchorJobHints = (html) => {\n  const hints = [];\n  const seen = new Set();\n  const re = /<a[^>]+href=[\"']([^\"']*)[\"'][^>]*>([\\s\\S]*?)<\\/a>/gi;\n  let match;\n\n  while ((match = re.exec(String(html || ''))) !== null) {\n    const url = normalizeJobUrl(match[1]);\n    if (!url) continue;\n\n    const jobId = url.match(/jobs\\/view\\/(\\d+)/)?.[1] || '';\n    if (!jobId || seen.has(jobId)) continue;\n    seen.add(jobId);\n\n    hints.push({\n      url,\n      jobId,\n      anchorText: cleanText(match[2]),\n      context: cleanText(String(html || '').slice(match.index, match.index + 1200)).slice(0, 500),\n    });\n  }\n\n  return hints;\n};\n\nconst formatJobHintsForAI = (hints, subjectHint) => {\n  const lines = [];\n  if (subjectHint.company || subjectHint.role) {\n    lines.push(`Subject hint: company=\"${subjectHint.company}\" role=\"${subjectHint.role}\"`);\n  }\n  hints.forEach((h, i) => {\n    lines.push(`Job block ${i + 1}:`);\n    lines.push(`  URL: ${h.url}`);\n    if (h.anchorText) lines.push(`  Link text: ${h.anchorText}`);\n    if (h.context) lines.push(`  Nearby text: ${h.context}`);\n  });\n  return lines.join('\\n');\n};\n\nconst subject = $json.subject || $json.Subject || '';\nconst html = $json.html || $json.textAsHtml || $json.text || $json.textPlain || '';\n\nconst cleanedSubject = cleanText(subject);\nconst emailText = cleanText(html);\nconst urls = extractLinkedInJobUrls(html);\nconst subjectHint = parseSubjectJobHint(subject);\nconst jobUrlHints = extractAnchorJobHints(html);\nconst subjectJobHintText = subjectHint.company || subjectHint.role\n  ? `company=\"${subjectHint.company}\" role=\"${subjectHint.role}\"`\n  : '';\nconst jobUrlHintsText = formatJobHintsForAI(jobUrlHints, subjectHint);\nconst emailTextForAI = [\n  `Subject: ${cleanedSubject}`,\n  '',\n  emailText,\n  subjectJobHintText ? `\\nSubject job hint:\\n${subjectJobHintText}` : '',\n  jobUrlHintsText ? `\\nStructured job URL blocks:\\n${jobUrlHintsText}` : '',\n].join('\\n');\nconst metaFromRead = $('Normalize Email Metadata').first().json || {};\n\nreturn {\n  json: {\n    EmailId: $json.EmailId || $json.id || metaFromRead.EmailId || '',\n    ThreadId: $json.ThreadId || $json.threadId || metaFromRead.ThreadId || '',\n    EmailReceived: firstNonEmpty(\n      $json.EmailReceived,\n      resolveEmailReceived($json),\n      metaFromRead.EmailReceived,\n      resolveEmailReceived(metaFromRead),\n    ),\n    EmailSubject: firstNonEmpty(\n      $json.EmailSubject,\n      $json.Subject,\n      $json.subject,\n      metaFromRead.EmailSubject,\n    ),\n    EmailSnippet: firstNonEmpty(\n      $json.EmailSnippet,\n      resolveEmailSnippet($json),\n      metaFromRead.EmailSnippet,\n      resolveEmailSnippet(metaFromRead),\n    ),\n    Subject: cleanedSubject,\n    EmailText: emailText,\n    EmailTextForAI: emailTextForAI,\n    SubjectJobHint: subjectHint,\n    SubjectJobHintText: subjectJobHintText,\n    JobUrlHints: jobUrlHints,\n    JobUrlHintsText: jobUrlHintsText,\n    LinkedInJobUrls: urls,\n    LinkedInJobUrlsText: urls.join('\\n'),\n    Source: 'LinkedIn'\n  }\n};"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -118,7 +516,7 @@
         "responses": {
           "values": [
             {
-              "content": "=You extract structured job cards from a LinkedIn job alert email.\n\nReturn JSON only.\nReturn one JSON array.\nDo not use markdown.\nDo not explain.\nDo not guess.\nDo not invent.\nDo not infer from company name.\nDo not infer from unrelated parts of the email.\n\nReturn this exact schema:\n\n[\n  {\n    \"company\": \"\",\n    \"role\": \"\",\n    \"location\": \"\",\n    \"work_type\": \"\",\n    \"url\": \"\"\n  }\n]\n\nExtraction rules:\n- Extract only real job cards.\n- Skip cards where company or role is missing.\n- Ignore buttons and labels: Apply, Save, Full-time, Promoted, Responses managed off LinkedIn, Actively reviewing applicants, Actively recruiting, Fast growing, See all jobs.\n- The company must be the real company shown inside the same job card.\n- The role must be the job title shown inside the same job card.\n- The location must be the location shown inside the same job card.\n- The work_type must be Remote, Hybrid, Onsite, or empty.\n- Do not use LinkedIn labels as company names.\n- Do not use another job title as a company name.\n- If company cannot be identified, skip the card.\n\nLocation extraction rules:\n- If a job card contains a location line with a city, region, country, or country name, use that line.\n- If the line says \"City, Region, Country\", extract the country.\n- If the line says \"City, Country\", extract the country.\n- If the line says only a country, use that country.\n- If the line contains \"England\", \"Scotland\", \"Wales\", or \"Northern Ireland\", normalize country to \"United Kingdom\".\n- If the line contains \"Portugal\", normalize country to \"Portugal\".\n- If the line contains \"Italy\", normalize country to \"Italy\".\n- If the line contains \"France\", normalize country to \"France\".\n- If the line contains \"Switzerland\", normalize country to \"Switzerland\".\n- If the line contains \"Netherlands\", normalize country to \"Netherlands\".\n- If the line contains \"Germany\", normalize country to \"Germany\".\n- If the line contains \"Spain\", normalize country to \"Spain\".\n- If the line contains \"United States\", normalize country to \"United States\".\n- If a location line exists, do not return \"Not specified\".\n\nWork type rules:\n- If the same card says Remote, set work_type to \"Remote\".\n- If the same card says Hybrid, set work_type to \"Hybrid\".\n- If the same card says On-site, Onsite, or On site, set work_type to \"Onsite\".\n- If no work type is visible, return empty string for work_type.\n\nLocation normalization rules:\n- If country is Bulgaria and work_type is Remote → Bulgaria · Remote\n- If country is Bulgaria and work_type is Hybrid → Bulgaria · Hybrid\n- If country is Bulgaria and work_type is Onsite → Bulgaria · Onsite\n- If country is United Kingdom and work_type is Remote → United Kingdom · Remote\n- If country is United Kingdom and work_type is Hybrid → United Kingdom · Hybrid\n- If country is United Kingdom and work_type is Onsite → United Kingdom · Onsite\n- If country is Portugal and work_type is Remote → Portugal · Remote\n- If country is Portugal and work_type is Hybrid → Portugal · Hybrid\n- If country is Portugal and work_type is Onsite → Portugal · Onsite\n- If country is Italy and work_type is Remote → Italy · Remote\n- If country is Italy and work_type is Hybrid → Italy · Hybrid\n- If country is Italy and work_type is Onsite → Italy · Onsite\n- If country is France and work_type is Remote → France · Remote\n- If country is France and work_type is Hybrid → France · Hybrid\n- If country is France and work_type is Onsite → France · Onsite\n- If country is Switzerland and work_type is Remote → Switzerland · Remote\n- If country is Switzerland and work_type is Hybrid → Switzerland · Hybrid\n- If country is Switzerland and work_type is Onsite → Switzerland · Onsite\n- If country is Netherlands and work_type is Remote → Netherlands · Remote\n- If country is Netherlands and work_type is Hybrid → Netherlands · Hybrid\n- If country is Netherlands and work_type is Onsite → Netherlands · Onsite\n- If country is Germany and work_type is Remote → Germany · Remote\n- If country is Germany and work_type is Hybrid → Germany · Hybrid\n- If country is Germany and work_type is Onsite → Germany · Onsite\n- If country is Spain and work_type is Remote → Spain · Remote\n- If country is Spain and work_type is Hybrid → Spain · Hybrid\n- If country is Spain and work_type is Onsite → Spain · Onsite\n- If country is United States and work_type is Remote → United States · Remote\n- If country is United States and work_type is Hybrid → United States · Hybrid\n- If country is United States and work_type is Onsite → United States · Onsite\n- If country is known but work_type is empty → return country only.\n- Remote Europe → Remote Europe\n- Remote EMEA → Remote EMEA\n- Remote Worldwide or Remote Global → Remote Worldwide\n- If no location line exists, return Not specified.\n\nURL rules:\n- Extract the LinkedIn job URL from the same job card only.\n- Use only URLs containing /jobs/view/.\n- If no job URL is visible for that exact card, return \"\".\n- Do not use a URL from another card.\n- Do not invent URLs.\n\nBad extraction examples:\n- Company must never be: Actively reviewing applicants, Actively recruiting, Fast growing, See all jobs, Install LinkedIn Widgets.\n- Company must never be another role title such as RevOps Manager or Revenue Systems Manager.\n- Do not output fictional or malformed locations.\n- Do not assign a location from one card to another card.\n\nEmail subject:\n{{$json.Subject}}\n\nEmail text:\n{{$json.EmailText}}\n\nLinkedIn job URLs available in this email:\n{{$json.LinkedInJobUrlsText}}"
+              "content": "=You extract structured job cards from a LinkedIn job alert email.\n\nReturn JSON only.\nReturn one JSON array.\nDo not use markdown.\nDo not explain.\nDo not guess.\nDo not invent.\nDo not infer from company name.\nDo not infer from unrelated parts of the email.\n\nReturn this exact schema:\n\n[\n  {\n    \"company\": \"\",\n    \"role\": \"\",\n    \"location\": \"\",\n    \"work_type\": \"\",\n    \"url\": \"\"\n  }\n]\n\nExtraction rules:\n- Extract only real job cards.\n- Skip cards where company or role is missing.\n- Ignore buttons and labels: Apply, Save, Full-time, Promoted, Responses managed off LinkedIn, Actively reviewing applicants, Actively recruiting, Fast growing, See all jobs.\n- The company must be the real company shown inside the same job card.\n- The role must be the job title shown inside the same job card.\n- The location must be the location shown inside the same job card.\n- The work_type must be Remote, Hybrid, Onsite, or empty.\n- Do not use LinkedIn labels as company names.\n- Do not use another job title as a company name.\n- If company cannot be identified, skip the card.\n\nLocation extraction rules:\n- If a job card contains a location line with a city, region, country, or country name, use that line.\n- If the line says \"City, Region, Country\", extract the country.\n- If the line says \"City, Country\", extract the country.\n- If the line says only a country, use that country.\n- If the line contains \"England\", \"Scotland\", \"Wales\", or \"Northern Ireland\", normalize country to \"United Kingdom\".\n- If the line contains \"Portugal\", normalize country to \"Portugal\".\n- If the line contains \"Italy\", normalize country to \"Italy\".\n- If the line contains \"France\", normalize country to \"France\".\n- If the line contains \"Switzerland\", normalize country to \"Switzerland\".\n- If the line contains \"Netherlands\", normalize country to \"Netherlands\".\n- If the line contains \"Germany\", normalize country to \"Germany\".\n- If the line contains \"Spain\", normalize country to \"Spain\".\n- If the line contains \"United States\", normalize country to \"United States\".\n- If a location line exists, do not return \"Not specified\".\n\nWork type rules:\n- If the same card says Remote, set work_type to \"Remote\".\n- If the same card says Hybrid, set work_type to \"Hybrid\".\n- If the same card says On-site, Onsite, or On site, set work_type to \"Onsite\".\n- If no work type is visible, return empty string for work_type.\n\nLocation normalization rules:\n- If country is Bulgaria and work_type is Remote → Bulgaria · Remote\n- If country is Bulgaria and work_type is Hybrid → Bulgaria · Hybrid\n- If country is Bulgaria and work_type is Onsite → Bulgaria · Onsite\n- If country is United Kingdom and work_type is Remote → United Kingdom · Remote\n- If country is United Kingdom and work_type is Hybrid → United Kingdom · Hybrid\n- If country is United Kingdom and work_type is Onsite → United Kingdom · Onsite\n- If country is Portugal and work_type is Remote → Portugal · Remote\n- If country is Portugal and work_type is Hybrid → Portugal · Hybrid\n- If country is Portugal and work_type is Onsite → Portugal · Onsite\n- If country is Italy and work_type is Remote → Italy · Remote\n- If country is Italy and work_type is Hybrid → Italy · Hybrid\n- If country is Italy and work_type is Onsite → Italy · Onsite\n- If country is France and work_type is Remote → France · Remote\n- If country is France and work_type is Hybrid → France · Hybrid\n- If country is France and work_type is Onsite → France · Onsite\n- If country is Switzerland and work_type is Remote → Switzerland · Remote\n- If country is Switzerland and work_type is Hybrid → Switzerland · Hybrid\n- If country is Switzerland and work_type is Onsite → Switzerland · Onsite\n- If country is Netherlands and work_type is Remote → Netherlands · Remote\n- If country is Netherlands and work_type is Hybrid → Netherlands · Hybrid\n- If country is Netherlands and work_type is Onsite → Netherlands · Onsite\n- If country is Germany and work_type is Remote → Germany · Remote\n- If country is Germany and work_type is Hybrid → Germany · Hybrid\n- If country is Germany and work_type is Onsite → Germany · Onsite\n- If country is Spain and work_type is Remote → Spain · Remote\n- If country is Spain and work_type is Hybrid → Spain · Hybrid\n- If country is Spain and work_type is Onsite → Spain · Onsite\n- If country is United States and work_type is Remote → United States · Remote\n- If country is United States and work_type is Hybrid → United States · Hybrid\n- If country is United States and work_type is Onsite → United States · Onsite\n- If country is known but work_type is empty → return country only.\n- Remote Europe → Remote Europe\n- Remote EMEA → Remote EMEA\n- Remote Worldwide or Remote Global → Remote Worldwide\n- If no location line exists, return Not specified.\n\nURL rules:\n- Extract the LinkedIn job URL from the same job card only.\n- Use only URLs containing /jobs/view/.\n- If no job URL is visible for that exact card, return \"\".\n- Do not use a URL from another card.\n- Do not invent URLs.\n\nSingle-job and similar-jobs alert emails:\n- These emails may show one featured job plus a \"similar jobs\" section.\n- Extract the featured job and each similar job as separate cards.\n- When classic card layout is missing, use Subject job hint and Structured job URL blocks.\n- Link text is often the role title; the next nearby text line is often the company.\n- Match each /jobs/view/ URL to the company, role, and location in its job block.\n- If the subject contains \"Company - Role posted on DATE\" after a colon, use that as a hint for the primary job when it matches a URL block.\n- Return one card per distinct job URL when company and role can be identified.\n- Return [] only when no company, no role, and no /jobs/view/ URLs exist in any input below.\n\nBad extraction examples:\n- Company must never be: Actively reviewing applicants, Actively recruiting, Fast growing, See all jobs, Install LinkedIn Widgets.\n- Company must never be another role title such as RevOps Manager or Revenue Systems Manager.\n- Do not output fictional or malformed locations.\n- Do not assign a location from one card to another card.\n\nEmail subject:\n{{$json.Subject}}\n\nEmail text:\n{{$json.EmailTextForAI}}\n\nSubject job hint:\n{{$json.SubjectJobHintText}}\n\nStructured job URL blocks:\n{{$json.JobUrlHintsText}}\n\nLinkedIn job URLs available in this email:\n{{$json.LinkedInJobUrlsText}}"
             }
           ]
         },
@@ -185,12 +583,14 @@
         "responses": {
           "values": [
             {
-              "content": "=You are an executive search consultant.\n\nCandidate profile:\n\n15+ years executive leadership\nCEO / Managing Director / COO experience\nP&L ownership\nInternational expansion\nOperations transformation\nMulti-country operations\nStrategy execution\nSales leadership\nGovernance and performance management\n\nLocation constraints:\n\nACCEPT:\n- Bulgaria\n- Remote Bulgaria\n- Remote Europe\n- Remote EMEA\n- Remote Worldwide\n\nREJECT:\n- On-site outside Bulgaria\n- Hybrid outside Bulgaria\n- Relocation required\n- In-country role outside Bulgaria\n\nIf the role is restricted to a specific country outside Bulgaria\n(e.g. UK Remote, Germany Remote, France Remote, Spain Remote),\nthen:\n\ncountry_fit = \"NO\"\nrecommendation = \"NO\"\nscore = maximum 4\n\nIf location is not explicitly stated:\n\ncountry_fit = UNKNOWN\nremote_fit = UNKNOWN\n\nIf the role requires mandatory deep domain expertise that the candidate does not clearly have, then:\n- sector_fit = \"NO\" or \"WEAK\"\n- recommendation = \"NO\"\n- score = maximum 5\n- final_decision = \"REJECT\" or \"MONITOR\"\n\nExamples of mandatory domain expertise:\n- deep healthcare regulatory experience\n- licensed financial services compliance ownership\n- gaming industry experience required\n- telecom engineering domain required\n- public sector procurement expertise required\n- crypto native experience required\n- AI/ML technical product leadership required\n\nIf domain experience is only preferred or nice to have, do not reject automatically. Mark as main risk.\n\nAvailable CVs:\n\n1. COO CV\n2. GTM & Commercial Operations CV\n3. Strategy & Operations CV\n4. Transformation CV\n5. Project / Program Leadership CV\n\nPROFILE FIT RULES\n\nThe candidate is strongest in:\n\n* COO\n* Chief Operating Officer\n* Managing Director\n* General Manager (technology-enabled businesses)\n* VP Operations\n* Operations Director\n* Business Operations\n* Strategy & Operations\n* Chief of Staff\n* Transformation Director\n* Business Transformation\n* Revenue Operations\n* GTM Operations\n* Commercial Operations\n* Portfolio Operations\n* Operational Excellence\n* Shared Services\n* Business Services\n* International Expansion\n* Multi-country Operations\n* P&L Ownership\n* Governance and Performance Management\n* PE-backed businesses\n* Founder-led businesses\n\nIndustries with strongest fit:\n\n* SaaS\n* Fintech\n* Payments\n* AI\n* Technology Platforms\n* Software\n* B2B Services\n* Business Services\n* Scale-ups\n* Technology-enabled businesses\n\nStrong fit means:\nThe role primarily relies on executive leadership, operations, transformation, commercial leadership, scaling, governance, execution, P&L ownership, or multi-country management.\n\nWeak fit means:\nThe role primarily relies on specialist domain expertise that is not clearly present in the candidate profile.\n\nExamples of weak-fit domains:\n\n* Hospitality\n* Hotel Management\n* Resort Management\n* Restaurant Operations\n* Clinical Leadership\n* Medical Leadership\n* Pharmaceutical Regulatory Leadership\n* Telecom Engineering Leadership\n* Public Sector Procurement Leadership\n* Gaming Industry Specialist Leadership\n* Deep Software Engineering Leadership\n\nIf the role is outside the candidate's core executive operating profile:\n\n* reduce score by 2-4 points\n* recommendation should normally be NO\n* final decision should normally be MONITOR or REJECT\n\nDo not give APPLY NOW solely because location matches.\nProfile fit is more important than location fit.\n\n\nJob:\n\nRole: {{$json.Role}}\nCompany: {{$json.Company}}\nLocation: {{$json.Location}}\nNotes: {{$json.Notes}}\nURL: {{$json.URL}}\nJobId: {{$json.JobId}}\nWorkType: {{$json.WorkType}}\nDedupeKey: {{$json.DedupeKey}}\n\nIf the role requires a working language other than English or Bulgarian, then:\n- language_fit = \"NO\"\n- country_fit = \"NO\" if the language is tied to a local market\n- recommendation = \"NO\"\n- score = maximum 4\n- final_decision = \"REJECT\"\n\nExamples:\nGerman required → REJECT\nFrench required → REJECT\nDutch required → REJECT\nSpanish required → REJECT\nItalian required → REJECT\n\nException:\nIf the language is only \"nice to have\", do not reject automatically. Mark it as a risk.\n\nTIME ZONE RULES\n\nReject roles requiring regular work aligned primarily to US time zones.\n\nExamples:\n- US Eastern Time\n- EST\n- EDT\n- New York hours\n- North America hours\n- US business hours\n- Pacific Time\n- PST\n- PDT\n- West Coast hours\n\nIf the role requires significant overlap with US working hours as a normal expectation:\n\ncountry_fit = \"NO\"\nrecommendation = \"NO\"\nscore = maximum 4\nfinal_decision = \"REJECT\"\n\nIf normal working hours are after 20:00 Bulgaria time, reject.\n\nException:\nOccasional meetings with US teams are acceptable and should not trigger rejection.\n\nHARD REJECT:\n- relocation required\n- hybrid outside Bulgaria\n- onsite outside Bulgaria\n- country-specific remote outside Bulgaria\n- mandatory non-English language\n- mandatory US time zone\n- mandatory deep domain expertise missing from profile\n\n\nCountry-specific remote roles are NOT acceptable.\n\nExamples:\nUnited Kingdom Remote = REJECT\nGermany Remote = REJECT\nFrance Remote = REJECT\nNetherlands Remote = REJECT\n\nAccept only:\n\nBulgaria\nBulgaria Hybrid\nBulgaria Onsite\nRemote Bulgaria\nRemote Europe\nRemote EMEA\nRemote Worldwide\n\nOriginal job fields:\nrole: {{$json.Role}}\ncompany: {{$json.Company}}\njob_id: {{$json.JobId}}\nlocation: {{$json.Location}}\nwork_type: {{$json.WorkType}}\nurl: {{$json.URL}}\ndedupe_key: {{$json.DedupeKey}}\n\nReturn ONLY JSON:\n\n{\n  \"role\": \"\",\n  \"company\": \"\",\n  \"job_id\": \"\",\n  \"location\": \"\",\n  \"work_type\": \"\",\n  \"url\": \"\",\n  \"dedupe_key\": \"\",\n  \"score\": 0,\n  \"interview_probability\": 0,\n  \"recommended_cv\": \"\",\n  \"recommendation\": \"\",\n  \"remote_fit\": \"\",\n  \"country_fit\": \"\",\n  \"seniority_fit\": \"\",\n  \"sector_fit\": \"\",\n  \"follow_up_priority\": \"\",\n  \"why_apply\": \"\",\n  \"main_risk\": \"\"\n}\n\nIMPORTANT:\nIn addition to the evaluation fields, return the original job fields exactly as provided:\nrole\ncompany\njob_id\nlocation\nwork_type\nurl\ndedupe_key"
+              "content": "=You are Stage 3 Initial Job Evaluation (AI 3).\n\nARCHITECTURE RULE (critical):\nYou score ROLE QUALITY ONLY.\nLocation eligibility is handled separately by Policy Engine / location verification — NOT by this AI step.\n\nYou evaluate card/metadata only (Role, Company, Location, WorkType, URL, Notes). You do NOT have the full LinkedIn posting.\n\nEVALUATE (role quality only):\n- role seniority\n- functional fit\n- executive scope\n- P&L / business unit ownership\n- transformation / operations / commercial fit\n- company attractiveness\n- interview probability\n- recommended CV\n\nDO NOT reduce score or recommendation because of:\n- UK Remote / United Kingdom · Remote\n- Spain · Remote / Netherlands · Remote / any country-specific remote LABEL\n- work authorization uncertainty\n- country-specific remote uncertainty\n\nFor country-specific remote on the card (e.g. United Kingdom · Remote, Spain · Remote, Netherlands · Remote):\n- country_fit = \"REVIEW_REQUIRED\"\n- location_fit = \"REVIEW_REQUIRED\"\n- main_risk = \"Location eligibility requires full posting verification.\" (unless a non-location role risk is clearly primary)\n\nScoring (1-10) and recommendation — ROLE QUALITY ONLY:\n- 7-10 + recommendation YES = strong role fit → proceed to Verified Review\n- 4-6 + recommendation MONITOR = borderline role fit\n- 0-3 + recommendation NO = clear role mismatch (junior, non-executive, wrong domain)\n\nYou MAY score low for clear ROLE problems:\n- junior / mid-level / support / coordinator roles\n- mandatory specialist domain clearly absent → sector_fit WEAK\n- hospitality/resort/restaurant GM roles → sector_fit WEAK\n\nDo NOT cap score at 4 (or below) and do NOT set recommendation NO solely for country-specific remote labels or work authorization uncertainty.\n\nOUTPUT VALUE STANDARDS (use exact strings only):\n- seniority_fit: FULL MATCH | PARTIAL | WEAK\n- sector_fit: FULL MATCH | PARTIAL | WEAK\n- country_fit: FULL MATCH | REVIEW_REQUIRED | MISMATCH\n- location_fit: FULL MATCH | REVIEW_REQUIRED | MISMATCH\n- recommendation: YES | MONITOR | NO\n- follow_up_priority: HIGH | MEDIUM | LOW\n- interview_probability: integer 0-100 (percentage, not 1-10)\n\nCandidate profile: 15+ years executive leadership (COO, MD, VP Operations, Strategy & Operations, transformation, commercial ops, multi-country P&L).\n\nAvailable CVs: COO CV | GTM & Commercial Operations CV | Strategy & Operations CV | AI Transformation CV | Project / Program Leadership CV\n\nJob:\nRole: {{$json.Role}}\nCompany: {{$json.Company}}\nLocation: {{$json.Location}}\nNotes: {{$json.Notes}}\nURL: {{$json.URL}}\nJobId: {{$json.JobId}}\nWorkType: {{$json.WorkType}}\nDedupeKey: {{$json.DedupeKey}}\n\nReturn ONLY JSON:\n{\n  \"role\": \"\",\n  \"company\": \"\",\n  \"job_id\": \"\",\n  \"location\": \"\",\n  \"work_type\": \"\",\n  \"url\": \"\",\n  \"dedupe_key\": \"\",\n  \"score\": 0,\n  \"interview_probability\": 0,\n  \"recommended_cv\": \"\",\n  \"recommendation\": \"\",\n  \"remote_fit\": \"\",\n  \"country_fit\": \"\",\n  \"location_fit\": \"\",\n  \"seniority_fit\": \"\",\n  \"sector_fit\": \"\",\n  \"follow_up_priority\": \"\",\n  \"why_apply\": \"\",\n  \"main_risk\": \"\"\n}\n\ninterview_probability must be an integer from 0 to 100.\n\nReturn original job fields exactly as provided. No markdown."
             }
           ]
         },
         "builtInTools": {},
-        "options": {}
+        "options": {
+          "temperature": 0
+        }
       },
       "type": "@n8n/n8n-nodes-langchain.openAi",
       "typeVersion": 2.3,
@@ -210,7 +610,7 @@
     {
       "parameters": {
         "mode": "runOnceForEachItem",
-        "jsCode": "const raw =\n  $json.output?.[0]?.content?.[0]?.text ||\n  $json.output?.[0]?.text ||\n  $json.content?.[0]?.text ||\n  $json.text ||\n  '';\n\nconst clean = String(raw)\n  .replace(/```json/gi, '')\n  .replace(/```/g, '')\n  .trim();\n\nlet ai;\n\ntry {\n  ai = JSON.parse(clean);\n} catch (e) {\n  return {\n    json: {\n      Role: '',\n      Company: '',\n      JobId: '',\n      Location: 'Not specified',\n      WorkType: '',\n      URL: '',\n      Source: 'LinkedIn',\n      Status: 'AI Parse Error',\n      Notes: '',\n      DedupeKey: '',\n\n      Score: 0,\n      InterviewProbability: 0,\n      RecommendedCV: 'Strategy & Operations CV',\n      Recommendation: 'NO',\n      RemoteFit: 'UNKNOWN',\n      CountryFit: 'UNKNOWN',\n      SeniorityFit: 'UNKNOWN',\n      SectorFit: 'UNKNOWN',\n      Priority: 'LOW',\n      WhyApply: '',\n      MainRisk: 'AI returned invalid JSON.',\n      ParseError: e.message\n    }\n  };\n}\n\nconst role = ai.role || '';\nconst company = ai.company || '';\nconst jobId = ai.job_id || '';\nconst location = ai.location || 'Not specified';\nconst workType = ai.work_type || '';\nconst url = ai.url || '';\nconst dedupeKey = ai.dedupe_key || (jobId || `${company}|${role}|${location}`).toLowerCase();\n\nreturn {\n  json: {\n    Role: role,\n    Company: company,\n    JobId: jobId,\n    Location: location,\n    WorkType: workType,\n    URL: url,\n    Source: 'LinkedIn',\n    Status: 'New',\n    Notes: '',\n    DedupeKey: dedupeKey,\n\n    Score: ai.score ?? 0,\n    InterviewProbability: ai.interview_probability ?? 0,\n    RecommendedCV: ai.recommended_cv || 'Strategy & Operations CV',\n    Recommendation: ai.recommendation || 'NO',\n    RemoteFit: ai.remote_fit || 'UNKNOWN',\n    CountryFit: ai.country_fit || 'UNKNOWN',\n    SeniorityFit: ai.seniority_fit || 'UNKNOWN',\n    SectorFit: ai.sector_fit || 'UNKNOWN',\n    Priority: ai.follow_up_priority || 'LOW',\n    WhyApply: ai.why_apply || '',\n    MainRisk: ai.main_risk || '',\n    ParseError: ''\n  }\n};"
+        "jsCode": "// INITIAL EVAL (internal routing only): InitialEvalScore, InitialEvalRecommendation, InitialEvalCV.\n// Do not set Score, VerifiedScore, or overwrite Preview* fields here.\nconst email = $('Parse Job Cards').item?.json || {};\nconst preview = $('Preview Score Job').item?.json || {};\nconst emailFields = {\n  EmailId: email.EmailId || preview.EmailId || '',\n  ThreadId: email.ThreadId || preview.ThreadId || '',\n  EmailReceived: email.EmailReceived || preview.EmailReceived || '',\n  EmailSubject: email.EmailSubject || preview.EmailSubject || '',\n  EmailSnippet: email.EmailSnippet || preview.EmailSnippet || '',\n};\nconst previewFields = {\n  PreviewScore: preview.PreviewScore ?? '',\n  PreviewRecommendation: preview.PreviewRecommendation || '',\n  PreviewReason: preview.PreviewReason || '',\n  PreviewRisk: preview.PreviewRisk || '',\n  PreviewCV: preview.PreviewCV || '',\n  PreviewScoreThreshold: preview.PreviewScoreThreshold ?? 7,\n};\n\nconst isCountrySpecificRemote = (location, workType = '') => {\n  const loc = String(location || '').toLowerCase().trim();\n  const wt = String(workType || '').toLowerCase().trim();\n  const hasRemote = wt === 'remote' || /\\bremote\\b/.test(loc);\n  if (!hasRemote) return false;\n  if (/remote europe|remote emea|remote worldwide|remote global|bulgaria/.test(loc)) return false;\n  if (loc.includes('· remote')) return true;\n  return /\\b(united kingdom|uk|spain|netherlands|france|germany|italy|portugal|switzerland)\\b/.test(loc);\n};\n\nconst looksLikeCardLocationRejection = (text) => {\n  const t = String(text || '').toLowerCase();\n  return /country-specific|not acceptable|residents only|work authorization|outside bulgaria|uk remote|united kingdom remote|spain remote|netherlands remote|france remote|germany remote|location mismatch|location reject/.test(t);\n};\n\nconst LOCATION_REVIEW_MSG = 'Location eligibility requires full posting verification.';\n\nconst clampInterviewProbability = (value) => {\n  const n = Number(value);\n  if (!Number.isFinite(n)) return 0;\n  const pct = n >= 0 && n <= 10 ? Math.round(n * 10) : Math.round(n);\n  return Math.max(0, Math.min(100, pct));\n};\n\nconst normalizeTriFit = (value, fallback = 'PARTIAL') => {\n  const v = String(value || '').trim().toUpperCase();\n  if (v === 'FULL MATCH' || v === 'FULL_MATCH') return 'FULL MATCH';\n  if (v === 'PARTIAL') return 'PARTIAL';\n  if (v === 'WEAK') return 'WEAK';\n  return fallback;\n};\n\nconst normalizeGeoFit = (value, fallback = 'REVIEW_REQUIRED') => {\n  const v = String(value || '').trim().toUpperCase();\n  if (v === 'FULL MATCH' || v === 'FULL_MATCH') return 'FULL MATCH';\n  if (v === 'REVIEW_REQUIRED') return 'REVIEW_REQUIRED';\n  if (v === 'MISMATCH') return 'MISMATCH';\n  return fallback;\n};\n\nconst normalizeRecommendation = (value, fallback = 'NO') => {\n  const v = String(value || '').trim().toUpperCase();\n  if (['YES', 'MONITOR', 'NO'].includes(v)) return v;\n  return fallback;\n};\n\nconst normalizePriority = (value, fallback = 'LOW') => {\n  const v = String(value || '').trim().toUpperCase();\n  if (['HIGH', 'MEDIUM', 'LOW'].includes(v)) return v;\n  return fallback;\n};\n\nconst sanitizeInitialEvalLocation = (ai, location, workType, previewCtx) => {\n  if (!isCountrySpecificRemote(location, workType)) return ai;\n  const out = { ...ai };\n  const hadLocationReject =\n    ['NO', 'MISMATCH'].includes(String(out.country_fit || '').toUpperCase()) ||\n    ['NO', 'MISMATCH'].includes(String(out.location_fit || '').toUpperCase()) ||\n    ['NO', 'MISMATCH'].includes(String(out.remote_fit || '').toUpperCase()) ||\n    looksLikeCardLocationRejection(out.main_risk);\n\n  out.country_fit = 'REVIEW_REQUIRED';\n  out.location_fit = 'REVIEW_REQUIRED';\n  if (['NO', 'MISMATCH', 'UNKNOWN', ''].includes(String(out.remote_fit || '').toUpperCase())) {\n    out.remote_fit = 'REVIEW_REQUIRED';\n  }\n\n  if (hadLocationReject || looksLikeCardLocationRejection(out.main_risk) || !String(out.main_risk || '').trim()) {\n    out.main_risk = LOCATION_REVIEW_MSG;\n  }\n\n  if (hadLocationReject) {\n    const score = Number(out.score);\n    const previewScore = Number(previewCtx.PreviewScore);\n    const floor = Number.isFinite(previewScore) ? Math.max(previewScore, 7) : 7;\n    if (Number.isFinite(score) && score < 7) out.score = Math.max(score, floor);\n    if (String(out.recommendation || '').toUpperCase() === 'NO') out.recommendation = 'YES';\n  }\n\n  return out;\n};\n\nconst raw =\n  $json.output?.[0]?.content?.[0]?.text ||\n  $json.output?.[0]?.text ||\n  $json.content?.[0]?.text ||\n  $json.text ||\n  '';\n\nconst clean = String(raw)\n  .replace(/```json/gi, '')\n  .replace(/```/g, '')\n  .trim();\n\nlet ai;\n\ntry {\n  ai = JSON.parse(clean);\n} catch (e) {\n  return {\n    json: {\n      ...emailFields,\n      ...previewFields,\n      Role: '',\n      Company: '',\n      JobId: '',\n      Location: 'Not specified',\n      WorkType: '',\n      URL: '',\n      Source: 'LinkedIn',\n      Status: 'AI Parse Error',\n      Notes: '',\n      DedupeKey: '',\n\n      InitialEvalScore: 0,\n      InterviewProbability: 0,\n      InitialEvalCV: 'Strategy & Operations CV',\n      InitialEvalRecommendation: 'NO',\n      RemoteFit: 'REVIEW_REQUIRED',\n      CountryFit: 'REVIEW_REQUIRED',\n      LocationFit: 'REVIEW_REQUIRED',\n      SeniorityFit: 'WEAK',\n      SectorFit: 'WEAK',\n      Priority: 'LOW',\n      WhyApply: '',\n      MainRisk: 'AI returned invalid JSON.',\n      ParseError: e.message\n    }\n  };\n}\n\nconst jobContext = $('Policy Engine').item?.json || {};\nai = sanitizeInitialEvalLocation(\n  ai,\n  ai.location || jobContext.Location || '',\n  ai.work_type || jobContext.WorkType || '',\n  preview,\n);\n\nconst role = ai.role || '';\nconst company = ai.company || '';\nconst jobId = ai.job_id || '';\nconst location = ai.location || 'Not specified';\nconst workType = ai.work_type || '';\nconst url = ai.url || '';\nconst dedupeKey = ai.dedupe_key || (jobId || `${company}|${role}|${location}`).toLowerCase();\n\nreturn {\n  json: {\n    ...emailFields,\n    ...previewFields,\n    Role: role,\n    Company: company,\n    JobId: jobId,\n    Location: location,\n    WorkType: workType,\n    URL: url,\n    Source: 'LinkedIn',\n    Status: 'New',\n    Notes: '',\n    DedupeKey: dedupeKey,\n\n    InitialEvalScore: ai.score ?? 0,\n    InterviewProbability: clampInterviewProbability(ai.interview_probability),\n    InitialEvalCV: ai.recommended_cv || 'Strategy & Operations CV',\n    InitialEvalRecommendation: normalizeRecommendation(ai.recommendation),\n    RemoteFit: normalizeGeoFit(ai.remote_fit),\n    CountryFit: normalizeGeoFit(ai.country_fit),\n    LocationFit: normalizeGeoFit(ai.location_fit),\n    SeniorityFit: normalizeTriFit(ai.seniority_fit),\n    SectorFit: normalizeTriFit(ai.sector_fit),\n    Priority: normalizePriority(ai.follow_up_priority),\n    WhyApply: ai.why_apply || '',\n    MainRisk: ai.main_risk || '',\n    ParseError: ''\n  }\n};"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -234,7 +634,7 @@
             {
               "id": "80c4bf2f-3183-494f-b399-aa7dd92bf4c1",
               "leftValue": 7,
-              "rightValue": "={{$json.Score}}",
+              "rightValue": "={{$json.InitialEvalScore}}",
               "operator": {
                 "type": "number",
                 "operation": "lte"
@@ -266,7 +666,7 @@
         "responses": {
           "values": [
             {
-              "content": "=You are an executive search consultant.\n\nCritical output rule:\n\nYou must return exactly one valid JSON object.\nDo not return markdown.\nDo not return code blocks.\nDo not return explanations.\nDo not ask questions.\nDo not return any text before or after the JSON.\nAll fields must always be present.\nIf information is missing, estimate conservatively and still return valid JSON.\n\nCandidate profile:\n\n15+ years executive leadership\nCEO / Managing Director / COO\nP&L ownership\nMulti-country operations\nOperations transformation\nStrategy execution\nCommercial leadership\n\n\nPROFILE FIT RULES\n\nThe candidate is strongest in:\n\n* COO\n* Chief Operating Officer\n* Managing Director\n* General Manager (technology-enabled businesses)\n* VP Operations\n* Operations Director\n* Business Operations\n* Strategy & Operations\n* Chief of Staff\n* Transformation Director\n* Business Transformation\n* Revenue Operations\n* GTM Operations\n* Commercial Operations\n* Portfolio Operations\n* Operational Excellence\n* Shared Services\n* Business Services\n* International Expansion\n* Multi-country Operations\n* P&L Ownership\n* Governance and Performance Management\n* PE-backed businesses\n* Founder-led businesses\n\nIndustries with strongest fit:\n\n* SaaS\n* Fintech\n* Payments\n* AI\n* Technology Platforms\n* Software\n* B2B Services\n* Business Services\n* Scale-ups\n* Technology-enabled businesses\n\nStrong fit means:\nThe role primarily relies on executive leadership, operations, transformation, commercial leadership, scaling, governance, execution, P&L ownership, or multi-country management.\n\nWeak fit means:\nThe role primarily relies on specialist domain expertise that is not clearly present in the candidate profile.\n\nExamples of weak-fit domains:\n\n* Hospitality\n* Hotel Management\n* Resort Management\n* Restaurant Operations\n* Clinical Leadership\n* Medical Leadership\n* Pharmaceutical Regulatory Leadership\n* Telecom Engineering Leadership\n* Public Sector Procurement Leadership\n* Gaming Industry Specialist Leadership\n* Deep Software Engineering Leadership\n\nIf the role is outside the candidate's core executive operating profile:\n\n* reduce score by 2-4 points\n* recommendation should normally be NO\n* final decision should normally be MONITOR or REJECT\n\nDo not give APPLY NOW solely because location matches.\nProfile fit is more important than location fit.\n\nLocation constraints:\n\nACCEPT:\n\n* Bulgaria\n* Remote Bulgaria\n* Remote Europe\n* Remote EMEA\n* Remote Worldwide\n\nREJECT:\n\n* Onsite outside Bulgaria\n* Hybrid outside Bulgaria\n* Relocation required\n\nMandatory language rules:\n\nEnglish = OK\nBulgarian = OK\n\nAny mandatory working language other than English or Bulgarian:\n\n* German\n* French\n* Dutch\n* Italian\n* Spanish\n* Polish\n* Czech\n* Swedish\n* Danish\n* Norwegian\n* Finnish\n* Portuguese\n* Romanian\n* Hungarian\n\n=> REJECT\n\nIf language is only preferred or nice-to-have:\nDo NOT reject automatically.\nAdd it as the biggest risk.\n\nMandatory domain expertise rules:\n\nReject or heavily downgrade roles requiring expertise that is clearly absent from the candidate profile, including:\n\n* Deep healthcare regulatory leadership\n* Licensed financial services compliance ownership\n* Gaming industry leadership\n* Telecom engineering leadership\n* Public sector procurement leadership\n* Crypto-native operating experience\n* AI/ML technical product leadership\n\nIf domain experience is only preferred:\nDo NOT reject automatically.\nAdd it as the biggest risk.\n\nUS TIME ZONE RULES\n\nReject if the role requires:\n\n* US Eastern Time\n* EST\n* EDT\n* New York hours\n* North America hours\n* US business hours\n* Pacific Time\n* PST\n* PDT\n* West Coast hours\n\nReject if normal working hours would be after 20:00 Bulgaria time.\n\nOccasional meetings with US teams are acceptable.\n\nScoring:\n\n0-3 = poor fit\n4-5 = weak fit\n6-7 = reasonable fit\n8-9 = strong fit\n10 = exceptional fit\n\nLocation fit values:\n\nFULL MATCH\n\n* Bulgaria\n* Remote Bulgaria\n* Remote Europe\n* Remote EMEA\n* Remote Worldwide\n\nLIKELY MATCH\n\n* Remote wording exists\n* Distributed company\n* Location suggests remote but not fully confirmed\n\nUNCLEAR\n\n* Location not specified\n\nMISMATCH\n\n* Onsite outside Bulgaria\n* Hybrid outside Bulgaria\n* Relocation required\n* Country-specific remote outside Bulgaria\n\nCV selection:\n\nCOO CV\n\n* COO\n* Chief Operating Officer\n* Managing Director\n* General Manager\n* VP Operations\n* Operations Director\n\nGTM & Commercial Operations CV\n\n* Chief Business Officer\n* Chief Growth Officer\n* Revenue Operations\n* Commercial Operations\n* GTM Operations\n* Sales Operations\n* Partnerships\n\nStrategy & Operations CV\n\n* Chief of Staff\n* Strategy\n* Business Transformation\n* Transformation Director\n* Strategic Operations\n\nAI Transformation CV\n\n* AI\n* Artificial Intelligence\n* Automation\n* Digital Transformation\n\nProject / Program Leadership CV\n\n* Program Director\n* Portfolio Director\n* PMO\n* Implementation Director\n\nSalary rules:\n\nReturn annual gross EUR.\n\nIf salary is provided:\nUse it.\n\nOtherwise estimate.\n\nSalary anchors:\n\nLead:\n100000-140000\n\nHead:\n130000-180000\n\nDirector:\n150000-220000\n\nVP:\n180000-300000\n\nC-Level:\n200000-400000+\n\nsalary_confidence must be:\n\nHIGH\nMEDIUM\nLOW\n\nsalary_assumption must be one of:\n\nRemote Bulgaria\nRemote Europe\nRemote EMEA\nRemote Worldwide\nBulgaria Hybrid\nNot specified\n\n\nMANDATORY PROFILE FIT OVERRIDE\n\nA role cannot receive:\n\n* APPLY NOW\n* score above 7\n\nunless there is a strong profile fit.\n\nLocation match alone is never sufficient.\n\nExamples:\n\nHotel General Manager → maximum score 6\nLuxury Hospitality Director → maximum score 6\nClinical Operations Director → maximum score 6\nTelecom Engineering Director → maximum score 6\n\nunless the candidate profile explicitly demonstrates that domain experience.\n\n\n\nFinal decision:\n\nAPPLY NOW\n\n* score 8-10\n* strong fit\n* acceptable location\n\nAPPLY IF INTERESTED\n\n* score 6-10\n* good opportunity\n* some uncertainty\n\nMONITOR\n\n* interesting company\n* notable risks\n* unclear mandate\n\nREJECT\n\n* score 0-5\n* location mismatch\n* language mismatch\n* domain mismatch\n* relocation required\n* US timezone requirement\n\nOriginal job fields:\nrole: {{$json.Role}}\ncompany: {{$json.Company}}\njob_id: {{$json.JobId}}\nwork_type: {{$json.WorkType}}\nurl: {{$json.URL}}\ndedupe_key: {{$json.DedupeKey}}\n\nReturn exactly this JSON schema:\n\n{\n\"final_score\": 0,\n\"apply\": \"\",\n\"best_cv\": \"\",\n\"interview_probability\": 0,\n\"salary_target_eur_gross\": \"\",\n\"salary_range_eur_gross\": \"\",\n\"salary_confidence\": \"\",\n\"salary_assumption\": \"\",\n\"location\": \"\",\n\"location_fit\": \"\",\n\"final_decision\": \"\",\n\"biggest_risk\": \"\",\n\"why_apply\": \"\",\n\"follow_up_priority\": \"\"\n\"role\": \"\",\n\"company\": \"\",\n\"job_id\": \"\",\n\"work_type\": \"\",\n\"url\": \"\",\n\"dedupe_key\": \"\",\n}\n\nRole:\n{{$json.Role}}\n\nCompany:\n{{$json.Company}}\n\nLocation:\n{{$json.Location}}\n\nNotes:\n{{$json.Notes}}\n\nURL:\n{{$json.URL}}\n"
+              "content": "=You are Stage 4 Full Verified Evaluation (AI 4).\n\nCritical output rule:\nReturn exactly one valid JSON object. No markdown. No text outside JSON. All fields must be present.\n\nARCHITECTURE RULE (critical):\nYou verify ROLE QUALITY and final role fit.\nLocation eligibility is handled separately by Policy Engine / location verification — NOT by penalizing score for country-specific remote labels.\n\nfinal_score and apply must reflect:\n- role seniority, executive scope, functional fit\n- P&L / business unit ownership\n- transformation / operations / commercial fit\n- company attractiveness, interview probability\n\nDO NOT reduce final_score or set apply=NO solely because of:\n- United Kingdom · Remote / UK Remote / Spain · Remote / Netherlands · Remote\n- any country-specific remote LABEL\n- work authorization uncertainty from label alone\n\nFor country-specific remote LABEL (without explicit posting constraints in Location/Notes):\n- location_fit = REVIEW_REQUIRED\n- biggest_risk = \"Location eligibility requires full posting verification.\" (unless a stronger non-location role risk exists)\n- Do NOT set location_fit = MISMATCH from label alone\n- Do NOT set final_decision = REJECT from label alone\n\nlocation_fit = MISMATCH only when Location or Notes EXPLICITLY requires:\n- relocation required\n- hybrid or onsite outside Bulgaria\n- mandatory residents-only / must be located in [country] / work authorization limited to [country]\n\nCandidate profile:\n15+ years executive leadership | COO / MD / VP Operations / Strategy & Operations | P&L | multi-country ops | transformation | commercial leadership\n\nPROFILE FIT RULES\nStrongest: COO, MD, GM, VP Operations, Operations Director, Strategy & Operations, Chief of Staff, Transformation Director, RevOps, GTM Ops, Commercial Ops, Portfolio Ops, International Expansion, P&L ownership.\nIndustries: SaaS, Fintech, Payments, AI, Tech Platforms, B2B Services, Scale-ups.\nWeak-fit domains: Hospitality GM, Hotel/Resort, Clinical/Medical regulatory, Pharma regulatory, Telecom engineering, Public sector procurement, Gaming specialist, Deep SWE leadership.\n\nIf role outside core executive profile: reduce final_score 2-4 points; apply normally NO; final_decision MONITOR or REJECT based on ROLE only.\n\nLanguage/timezone: reject only if EXPLICITLY required in Location or Notes. Otherwise note as risk — do not auto-reject from label alone.\n\nDomain expertise: reject/downgrade only when clearly mandatory and absent. Preferred/nice-to-have → biggest_risk only.\n\nScoring (role quality only):\n0-3 poor | 4-5 weak | 6-7 reasonable | 8-9 strong | 10 exceptional\n\nlocation_fit values:\nFULL MATCH — Bulgaria, Remote Bulgaria, Remote Europe, Remote EMEA, Remote Worldwide\nREVIEW_REQUIRED — country-specific remote label; eligibility not verified from posting text\nMISMATCH — only explicit relocation/hybrid/onsite/residents-only constraints in Location/Notes\n\nCV selection:\nCOO CV — COO, MD, GM, VP Ops, Operations Director\nGTM & Commercial Operations CV — CBO, CGO, RevOps, Commercial Ops, GTM Ops, Sales Ops\nStrategy & Operations CV — Chief of Staff, Strategy, Transformation Director\nAI Transformation CV — AI, Automation, Digital Transformation\nProject / Program Leadership CV — Program/Portfolio Director, PMO\n\nSalary: annual gross EUR. Anchors — Lead 100-140k, Head 130-180k, Director 150-220k, VP 180-300k, C-Level 200-400k+. salary_assumption: describe the basis of the salary estimate (e.g. \"VP Operations EU market benchmark\", \"Posted salary used\", \"Director SaaS compensation anchor\") — do NOT use location/remote labels (Remote Europe, Remote Bulgaria, etc.) as salary_assumption.\n\nOUTPUT VALUE STANDARDS (use exact strings only):\n- location_fit: FULL MATCH | REVIEW_REQUIRED | MISMATCH\n- apply: YES | MONITOR | NO\n- final_decision: APPLY NOW | MONITOR | REJECT\n- follow_up_priority: HIGH | MEDIUM | LOW\n- salary_confidence: HIGH | MEDIUM | LOW\n- interview_probability: integer 0-100 (percentage, not 1-10 scale)\n\napply (Verified Recommendation):\n- YES — strong role fit (typically final_score 8-10)\n- MONITOR — partial fit or notable role risks (typically final_score 6-7)\n- NO — weak role fit or clear mismatch (typically final_score 0-5)\n\nfinal_decision (role quality):\nAPPLY NOW — final_score 8-10, strong role fit; apply=YES\nMONITOR — final_score 6-7, partial fit, notable role/company risks, or apply=MONITOR; REVIEW_REQUIRED location is NOT automatic REJECT\nREJECT — final_score 0-5 or clear role/domain mismatch; apply=NO; NOT for country-specific remote label alone\n\nRole: {{$json.Role}}\nCompany: {{$json.Company}}\nLocation: {{$json.Location}}\nNotes: {{$json.Notes}}\nURL: {{$json.URL}}\nJobId: {{$json.JobId}}\nWorkType: {{$json.WorkType}}\n\nReturn exactly this JSON:\n{\n\"final_score\": 0,\n\"apply\": \"\",\n\"best_cv\": \"\",\n\"interview_probability\": 0,\n\"salary_target_eur_gross\": \"\",\n\"salary_range_eur_gross\": \"\",\n\"salary_confidence\": \"\",\n\"salary_assumption\": \"\",\n\"location\": \"\",\n\"location_fit\": \"\",\n\"final_decision\": \"\",\n\"biggest_risk\": \"\",\n\"why_apply\": \"\",\n\"follow_up_priority\": \"\",\n\"role\": \"\",\n\"company\": \"\",\n\"job_id\": \"\",\n\"work_type\": \"\",\n\"url\": \"\",\n\"dedupe_key\": \"\"\n}"
             }
           ]
         },
@@ -294,7 +694,7 @@
     {
       "parameters": {
         "mode": "runOnceForEachItem",
-        "jsCode": "const reason =\n  $json.RejectReason ||\n  $json.auto_reject_reason ||\n  $json.LocationRejectReason ||\n  (\n    $json.LocationAllowed === false\n      ? 'Location rejected.'\n      : 'Low score.'\n  );\n\nlet status = 'Rejected';\n\nif ($json.LocationAllowed === false) {\n  status = 'Location Rejected';\n} else if ($json.auto_reject_reason === 'DOMAIN') {\n  status = 'Domain Rejected';\n} else if ($json.auto_reject_reason === 'LANGUAGE') {\n  status = 'Language Rejected';\n} else if ($json.auto_reject_reason === 'TIMEZONE') {\n  status = 'Timezone Rejected';\n} else if ($json.auto_reject_reason === 'PROFILE') {\n  status = 'Profile Rejected';\n} else if ($json.auto_reject_reason === 'LOW_SCORE') {\n  status = 'Low Score';\n}\n\nreturn {\n  json: {\n    ...$json,\n\n    VerifiedScore: $json.Score ?? 0,\n    VerifiedRecommendation: 'NO',\n    FinalCV: $json.RecommendedCV || 'Strategy & Operations CV',\n    VerifiedInterviewProbability: $json.InterviewProbability ?? 0,\n\n    SalaryEstimate: '',\n    SalaryTarget: '',\n    SalaryConfidence: 'LOW',\n    SalaryAssumption: $json.LocationAllowed === false\n      ? 'Location rejected'\n      : 'Not specified',\n\n    VerifiedRisk: $json.MainRisk || $json.LocationRejectReason || reason,\n    VerifiedWhyApply: $json.LocationAllowed === false\n      ? 'Rejected by location filter.'\n      : ($json.WhyApply || 'Rejected before final evaluation.'),\n    VerifiedPriority: 'LOW',\n\n    LocationFit: $json.LocationAllowed === false\n      ? 'MISMATCH'\n      : ($json.LocationFit || 'UNKNOWN'),\n\n    FinalDecision: 'REJECT',\n    RejectReason: reason,\n    Status: status\n  }\n};"
+        "jsCode": "// Verified* empty when full evaluation did not run. Do not set Score here — Sheets maps final Score.\nconst reason =\n  $json.RejectReason ||\n  $json.auto_reject_reason ||\n  $json.LocationRejectReason ||\n  (\n    $json.LocationAllowed === false\n      ? 'Location rejected.'\n      : 'Low score.'\n  );\n\nlet status = 'Rejected';\n\nif ($json.LocationAllowed === false) {\n  status = 'Location Rejected';\n} else if ($json.auto_reject_reason === 'DOMAIN') {\n  status = 'Domain Rejected';\n} else if ($json.auto_reject_reason === 'LANGUAGE') {\n  status = 'Language Rejected';\n} else if ($json.auto_reject_reason === 'TIMEZONE') {\n  status = 'Timezone Rejected';\n} else if ($json.auto_reject_reason === 'PROFILE') {\n  status = 'Profile Rejected';\n} else if ($json.auto_reject_reason === 'LOW_SCORE') {\n  status = 'Low Score';\n}\n\nreturn {\n  json: {\n    ...$json,\n\n    VerifiedScore: '',\n    VerifiedRecommendation: '',\n    VerifiedRisk: '',\n    VerifiedWhyApply: '',\n    FinalCV: '',\n    VerifiedInterviewProbability: $json.InterviewProbability ?? 0,\n\n    SalaryEstimate: '',\n    SalaryTarget: '',\n    SalaryConfidence: '',\n    SalaryAssumption: '',\n\n    VerifiedPriority: 'LOW',\n\n    LocationFit: $json.LocationAllowed === false\n      ? 'MISMATCH'\n      : ($json.LocationFit || 'REVIEW_REQUIRED'),\n\n    FinalDecision: 'REJECT',\n    PipelineStage: 'POLICY_REJECT',\n    RejectReason: reason,\n    Status: status\n  }\n};"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -338,17 +738,17 @@
           "value": {
             "Date": "={{ $now }}",
             "Source": "={{ $json.Source }}",
-            "Notes": "={{ $json.MainRisk }}",
+            "Notes": "={{ String($json.VerifiedRisk) !== '' ? $json.VerifiedRisk : ($json.MainRisk || $json.PreviewReason || $json.PreviewRisk || '') }}",
             "Status": "={{ $json.Status }}",
             "Company": "= {{ $json.Company }}",
             "Role": "={{ $json.Role }}",
             "Location": "={{$json.Location}}",
             "URL": "={{ $json.URL }}",
             "Remote": "={{ $json.RemoteFit }}",
-            "Score": "={{$json.Score}}",
+            "Score": "={{ String($json.VerifiedScore) !== '' ? $json.VerifiedScore : $json.PreviewScore }}",
             "Interview Probability": "={{$json.InterviewProbability}}",
-            "Recommended CV": "={{$json.RecommendedCV}}",
-            "Recommendation": "={{$json.Recommendation}}",
+            "Recommended CV": "={{ String($json.FinalCV) !== '' ? $json.FinalCV : $json.PreviewCV }}",
+            "Recommendation": "={{ String($json.VerifiedRecommendation) !== '' ? $json.VerifiedRecommendation : $json.PreviewRecommendation }}",
             "Country Fit": "={{$json.CountryFit}}",
             "Seniority Fit": "={{$json.SeniorityFit}}",
             "Sector Fit": "= {{$json.SectorFit}}",
@@ -358,6 +758,7 @@
             "Verified Recommendation": "={{$json.VerifiedRecommendation}}",
             "Final CV": "={{$json.FinalCV}}",
             "Salary Estimate": "={{$json.SalaryEstimate}}",
+            "Salary Range": "={{$json.SalaryRange}}",
             "Verified Risk": "={{$json.VerifiedRisk}}",
             "Verified Why Apply": "={{$json.VerifiedWhyApply}}",
             "Verified Priority": "={{$json.VerifiedPriority}}",
@@ -367,7 +768,20 @@
             "Location Fit": "={{ $json.LocationFit }}",
             "DedupeKey": "={{$json.DedupeKey}}",
             "RejectReason": "={{ $json.RejectReason }}",
-            "auto_reject_reason": "="
+            "auto_reject_reason": "=",
+            "EmailId": "={{$json.EmailId}}",
+            "ThreadId": "={{$json.ThreadId}}",
+            "EmailReceived": "={{$json.EmailReceived}}",
+            "EmailSubject": "={{$json.EmailSubject}}",
+            "EmailSnippet": "={{$json.EmailSnippet}}",
+            "ExtractionStatus": "={{$json.ExtractionStatus}}",
+            "ExtractionError": "={{$json.ExtractionError}}",
+            "PreviewScore": "={{$json.PreviewScore}}",
+            "PreviewRecommendation": "={{$json.PreviewRecommendation}}",
+            "PreviewReason": "={{$json.PreviewReason}}",
+            "PreviewRisk": "={{$json.PreviewRisk}}",
+            "PreviewCV": "={{$json.PreviewCV}}",
+            "PipelineStage": "={{$json.PipelineStage}}"
           },
           "matchingColumns": [],
           "schema": [
@@ -741,6 +1155,136 @@
               "type": "string",
               "canBeUsedToMatch": true,
               "removed": false
+            },
+            {
+              "id": "EmailId",
+              "displayName": "EmailId",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "ThreadId",
+              "displayName": "ThreadId",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "EmailReceived",
+              "displayName": "EmailReceived",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "EmailSubject",
+              "displayName": "EmailSubject",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "EmailSnippet",
+              "displayName": "EmailSnippet",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "ExtractionStatus",
+              "displayName": "ExtractionStatus",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "ExtractionError",
+              "displayName": "ExtractionError",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "PreviewScore",
+              "displayName": "PreviewScore",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "PreviewRecommendation",
+              "displayName": "PreviewRecommendation",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "PreviewReason",
+              "displayName": "PreviewReason",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "PreviewRisk",
+              "displayName": "PreviewRisk",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "PreviewCV",
+              "displayName": "PreviewCV",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "PipelineStage",
+              "displayName": "PipelineStage",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
             }
           ],
           "attemptToConvertTypes": false,
@@ -826,7 +1370,7 @@
     {
       "parameters": {
         "mode": "runOnceForEachItem",
-        "jsCode": "const original =\n  $('Normalize AI Evaluation').item?.json ||\n  $json;\n\nconst raw =\n  $json.output?.[0]?.content?.[0]?.text ||\n  $json.output?.[0]?.text ||\n  $json.content?.[0]?.text ||\n  $json.text ||\n  $json.response ||\n  $json.message ||\n  '';\n\nlet clean = String(raw)\n  .replace(/```json/gi, '')\n  .replace(/```/g, '')\n  .trim();\n\n// Try to extract JSON object if model returned extra text\nconst firstBrace = clean.indexOf('{');\nconst lastBrace = clean.lastIndexOf('}');\n\nif (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {\n  clean = clean.slice(firstBrace, lastBrace + 1);\n}\n\nlet ai;\n\ntry {\n  ai = JSON.parse(clean);\n} catch (e) {\n  return {\n    json: {\n      ...original,\n\n      VerifiedScore: original.Score ?? 0,\n      VerifiedRecommendation: original.Recommendation || 'NO',\n      FinalCV: original.RecommendedCV || 'Strategy & Operations CV',\n      VerifiedInterviewProbability: original.InterviewProbability ?? 0,\n\n      SalaryEstimate: '',\n      SalaryTarget: '',\n      SalaryConfidence: 'LOW',\n      SalaryAssumption: 'Not specified',\n\n      VerifiedRisk: 'Verified review returned invalid JSON.',\n      VerifiedWhyApply: original.WhyApply || '',\n      VerifiedPriority: original.Priority || 'LOW',\n\n      SalaryRange: '',\n      Location: original.Location || 'Not specified',\n      LocationFit: original.LocationFit || 'UNKNOWN',\n\n      FinalDecision: 'MONITOR',\n      ParseError: e.message,\n\n      DedupeKey: original.DedupeKey && original.DedupeKey !== '||'\n        ? original.DedupeKey\n        : (\n            original.JobId ||\n            `${original.Company || ''}|${original.Role || ''}|${original.Location || ''}`.toLowerCase()\n          )\n    }\n  };\n}\n\nreturn {\n  json: {\n    ...original,\n\n    Role: original.Role || ai.role || '',\n    Company: original.Company || ai.company || '',\n    JobId: original.JobId || ai.job_id || '',\n    WorkType: original.WorkType || ai.work_type || '',\n    URL: original.URL || ai.url || '',\n\n    VerifiedScore: ai.final_score ?? original.Score ?? 0,\n    VerifiedRecommendation: ai.apply || original.Recommendation || 'NO',\n    FinalCV: ai.best_cv || original.RecommendedCV || 'Strategy & Operations CV',\n    VerifiedInterviewProbability: ai.interview_probability ?? original.InterviewProbability ?? 0,\n\n    SalaryEstimate: ai.salary_range_eur_gross || '',\n    SalaryTarget: ai.salary_target_eur_gross || '',\n    SalaryConfidence: ai.salary_confidence || 'LOW',\n    SalaryAssumption: ai.salary_assumption || 'Not specified',\n\n    VerifiedRisk: ai.biggest_risk || original.MainRisk || '',\n    VerifiedWhyApply: ai.why_apply || original.WhyApply || '',\n    VerifiedPriority: ai.follow_up_priority || original.Priority || 'LOW',\n\n    SalaryRange: ai.salary_range_eur_gross || '',\n    Location: ai.location || original.Location || 'Not specified',\n    LocationFit: ai.location_fit || original.LocationFit || 'UNKNOWN',\n\n    FinalDecision: ai.final_decision || 'MONITOR',\n\n    ParseError: '',\n\n    DedupeKey: original.DedupeKey && original.DedupeKey !== '||'\n      ? original.DedupeKey\n      : (\n          ai.dedupe_key ||\n          ai.job_id ||\n          original.JobId ||\n          `${original.Company || ai.company || ''}|${original.Role || ai.role || ''}|${ai.location || original.Location || ''}`.toLowerCase()\n        )\n  }\n};"
+        "jsCode": "// VERIFIED STAGE: VerifiedScore, VerifiedRecommendation, VerifiedRisk, VerifiedWhyApply (+ FinalCV, salary from verified AI only).\n// Never fall back to InitialEvalScore or Preview* for verified fields.\n// Role quality only — location label must not reduce score.\nconst original =\n  $('Normalize AI Evaluation').item?.json ||\n  $json;\n\nconst isCountrySpecificRemote = (location, workType = '') => {\n  const loc = String(location || '').toLowerCase().trim();\n  const wt = String(workType || '').toLowerCase().trim();\n  const hasRemote = wt === 'remote' || /\\bremote\\b/.test(loc);\n  if (!hasRemote) return false;\n  if (/remote europe|remote emea|remote worldwide|remote global|bulgaria/.test(loc)) return false;\n  if (loc.includes('· remote')) return true;\n  return /\\b(united kingdom|uk|spain|netherlands|france|germany|italy|portugal|switzerland)\\b/.test(loc);\n};\n\nconst looksLikeLabelLocationRejection = (text, locationFit, finalDecision, score) => {\n  const t = String(text || '').toLowerCase();\n  const textReject = /country-specific|not acceptable|residents only|work authorization|outside bulgaria|uk remote|united kingdom remote|spain remote|netherlands remote|location mismatch/.test(t);\n  const fitReject = ['MISMATCH', 'NO'].includes(String(locationFit || '').toUpperCase());\n  const decisionReject = String(finalDecision || '').toUpperCase() === 'REJECT' && Number(score) <= 5;\n  return textReject || fitReject || decisionReject;\n};\n\nconst LOCATION_REVIEW_MSG = 'Location eligibility requires full posting verification.';\n\nconst clampInterviewProbability = (value) => {\n  const n = Number(value);\n  if (!Number.isFinite(n)) return 0;\n  const pct = n >= 0 && n <= 10 ? Math.round(n * 10) : Math.round(n);\n  return Math.max(0, Math.min(100, pct));\n};\n\nconst normalizeRecommendation = (value, fallback = 'NO') => {\n  const v = String(value || '').trim().toUpperCase();\n  if (['YES', 'MONITOR', 'NO'].includes(v)) return v;\n  return fallback;\n};\n\nconst normalizeFinalDecision = (value, fallback = 'MONITOR') => {\n  const v = String(value || '').trim().toUpperCase();\n  if (v === 'APPLY IF INTERESTED' || v === 'APPLY_IF_INTERESTED') return 'MONITOR';\n  if (v === 'APPLY NOW' || v === 'APPLY_NOW' || v === 'APPLY') return 'APPLY NOW';\n  if (v === 'MONITOR') return 'MONITOR';\n  if (v === 'REJECT') return 'REJECT';\n  return fallback;\n};\n\nconst normalizeGeoFit = (value, fallback = 'REVIEW_REQUIRED') => {\n  const v = String(value || '').trim().toUpperCase();\n  if (v === 'FULL MATCH' || v === 'FULL_MATCH') return 'FULL MATCH';\n  if (v === 'REVIEW_REQUIRED') return 'REVIEW_REQUIRED';\n  if (v === 'MISMATCH') return 'MISMATCH';\n  return fallback;\n};\n\nconst normalizePriority = (value, fallback = 'LOW') => {\n  const v = String(value || '').trim().toUpperCase();\n  if (['HIGH', 'MEDIUM', 'LOW'].includes(v)) return v;\n  return fallback;\n};\n\nconst normalizeSalaryConfidence = (value, fallback = 'LOW') => {\n  const v = String(value || '').trim().toUpperCase();\n  if (['HIGH', 'MEDIUM', 'LOW'].includes(v)) return v;\n  return fallback;\n};\n\nconst resolvePipelineStageFromVerified = (finalDecision) => {\n  const d = String(finalDecision || '').toUpperCase().trim();\n  if (d === 'REJECT') return 'FINAL_REJECT';\n  if (d === 'APPLY NOW' || d === 'APPLY') return 'FINAL_ACCEPT';\n  return 'FULL_EVALUATION';\n};\n\nconst isLocationOnlySalaryAssumption = (value) => {\n  const v = String(value || '').trim().toLowerCase();\n  return [\n    'remote bulgaria', 'remote europe', 'remote emea', 'remote worldwide', 'remote global',\n    'bulgaria hybrid', 'bulgaria onsite', 'not specified',\n  ].includes(v) || /^remote /.test(v);\n};\n\nconst normalizeSalaryAssumption = (assumption) => {\n  if (isLocationOnlySalaryAssumption(assumption)) {\n    return 'Estimated from role seniority and executive compensation anchors';\n  }\n  const text = String(assumption || '').trim();\n  return text || 'Not specified';\n};\n\nconst parseSalaryNumber = (value) => {\n  const s = String(value || '').trim();\n  if (!s) return NaN;\n  const kMatch = s.replace(/[,\\s]/g, '').match(/^([\\d.]+)k$/i);\n  if (kMatch) return Math.round(parseFloat(kMatch[1]) * 1000);\n  const digits = s.replace(/[^\\d.]/g, '');\n  const n = Number(digits);\n  return Number.isFinite(n) ? Math.round(n) : NaN;\n};\n\nconst mapSalaryFields = (ai) => {\n  const rawRange = String(ai.salary_range_eur_gross || '').trim();\n  const rawTarget = String(ai.salary_target_eur_gross || '').trim();\n  let salaryRange = '';\n  let salaryEstimate = '';\n\n  const rangeMatch = rawRange.match(/([\\d.k]+)\\s*(?:-|–|—|\\sto\\s)+\\s*([\\d.k]+)/i);\n  if (rangeMatch) {\n    const low = parseSalaryNumber(rangeMatch[1]);\n    const high = parseSalaryNumber(rangeMatch[2]);\n    if (Number.isFinite(low) && Number.isFinite(high)) {\n      const min = Math.min(low, high);\n      const max = Math.max(low, high);\n      salaryRange = min === max ? String(min) : `${min}-${max}`;\n    }\n  } else {\n    const single = parseSalaryNumber(rawRange);\n    if (Number.isFinite(single)) salaryRange = String(single);\n  }\n\n  const targetNum = parseSalaryNumber(rawTarget);\n  if (Number.isFinite(targetNum)) {\n    salaryEstimate = String(targetNum);\n  } else if (salaryRange.includes('-')) {\n    const [lowStr, highStr] = salaryRange.split('-');\n    const low = Number(lowStr);\n    const high = Number(highStr);\n    if (Number.isFinite(low) && Number.isFinite(high)) {\n      salaryEstimate = String(Math.round((low + high) / 2));\n    }\n  } else if (salaryRange) {\n    salaryEstimate = salaryRange;\n  }\n\n  return {\n    SalaryRange: salaryRange,\n    SalaryEstimate: salaryEstimate,\n    SalaryTarget: rawTarget || salaryEstimate,\n  };\n};\n\nconst sanitizeVerifiedLocation = (ai, location, workType, ctx) => {\n  if (!isCountrySpecificRemote(location, workType)) return ai;\n  const out = { ...ai };\n  const hadLabelLocationReject = looksLikeLabelLocationRejection(\n    out.biggest_risk,\n    out.location_fit,\n    out.final_decision,\n    out.final_score,\n  );\n\n  out.location_fit = 'REVIEW_REQUIRED';\n\n  if (hadLabelLocationReject || looksLikeLabelLocationRejection(out.biggest_risk, '', '', 0) || !String(out.biggest_risk || '').trim()) {\n    out.biggest_risk = LOCATION_REVIEW_MSG;\n  }\n\n  if (hadLabelLocationReject) {\n    const score = Number(out.final_score);\n    const roleFloor = Math.max(\n      Number(ctx.InitialEvalScore) || 0,\n      Number(ctx.PreviewScore) || 0,\n      7,\n    );\n    if (Number.isFinite(score) && score < 7) out.final_score = Math.max(score, roleFloor);\n    if (String(out.apply || '').toUpperCase() === 'NO') out.apply = 'YES';\n    if (String(out.final_decision || '').toUpperCase() === 'REJECT') {\n      const s = Number(out.final_score);\n      out.final_decision = s >= 8 ? 'APPLY NOW' : 'MONITOR';\n    }\n  }\n\n  return out;\n};\n\nconst raw =\n  $json.output?.[0]?.content?.[0]?.text ||\n  $json.output?.[0]?.text ||\n  $json.content?.[0]?.text ||\n  $json.text ||\n  $json.response ||\n  $json.message ||\n  '';\n\nlet clean = String(raw)\n  .replace(/```json/gi, '')\n  .replace(/```/g, '')\n  .trim();\n\n// Try to extract JSON object if model returned extra text\nconst firstBrace = clean.indexOf('{');\nconst lastBrace = clean.lastIndexOf('}');\n\nif (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {\n  clean = clean.slice(firstBrace, lastBrace + 1);\n}\n\nlet ai;\n\ntry {\n  ai = JSON.parse(clean);\n} catch (e) {\n  return {\n    json: {\n      ...original,\n\n      VerifiedScore: 0,\n      VerifiedRecommendation: 'NO',\n      FinalCV: '',\n      VerifiedInterviewProbability: clampInterviewProbability(original.InterviewProbability),\n\n      SalaryEstimate: '',\n      SalaryTarget: '',\n      SalaryConfidence: 'LOW',\n      SalaryAssumption: 'Not specified',\n\n      VerifiedRisk: 'Verified review returned invalid JSON.',\n      VerifiedWhyApply: '',\n      VerifiedPriority: original.Priority || 'LOW',\n\n      SalaryRange: '',\n      Location: original.Location || 'Not specified',\n      LocationFit: original.LocationFit || 'REVIEW_REQUIRED',\n      CountryFit: original.CountryFit || 'REVIEW_REQUIRED',\n\n      FinalDecision: 'MONITOR',\n      PipelineStage: 'FULL_EVALUATION',\n      ParseError: e.message,\n\n      DedupeKey: original.DedupeKey && original.DedupeKey !== '||'\n        ? original.DedupeKey\n        : (\n            original.JobId ||\n            `${original.Company || ''}|${original.Role || ''}|${original.Location || ''}`.toLowerCase()\n          )\n    }\n  };\n}\n\nconst evalLocation = ai.location || original.Location || '';\nconst evalWorkType = ai.work_type || original.WorkType || '';\nai = sanitizeVerifiedLocation(ai, evalLocation, evalWorkType, original);\nconst countrySpecificRemote = isCountrySpecificRemote(evalLocation, evalWorkType);\nconst salaryFields = mapSalaryFields(ai);\n\nreturn {\n  json: {\n    ...original,\n\n    Role: original.Role || ai.role || '',\n    Company: original.Company || ai.company || '',\n    JobId: original.JobId || ai.job_id || '',\n    WorkType: original.WorkType || ai.work_type || '',\n    URL: original.URL || ai.url || '',\n\n    VerifiedScore: ai.final_score ?? 0,\n    VerifiedRecommendation: normalizeRecommendation(ai.apply),\n    FinalCV: ai.best_cv || 'Strategy & Operations CV',\n    VerifiedInterviewProbability: clampInterviewProbability(ai.interview_probability ?? original.InterviewProbability),\n\n    SalaryEstimate: salaryFields.SalaryEstimate,\n    SalaryTarget: salaryFields.SalaryTarget,\n    SalaryConfidence: normalizeSalaryConfidence(ai.salary_confidence),\n    SalaryAssumption: normalizeSalaryAssumption(ai.salary_assumption),\n\n    VerifiedRisk: ai.biggest_risk || '',\n    VerifiedWhyApply: ai.why_apply || '',\n    VerifiedPriority: normalizePriority(ai.follow_up_priority || original.Priority),\n\n    SalaryRange: salaryFields.SalaryRange,\n    Location: ai.location || original.Location || 'Not specified',\n    LocationFit: normalizeGeoFit(ai.location_fit || original.LocationFit),\n    CountryFit: normalizeGeoFit(countrySpecificRemote ? 'REVIEW_REQUIRED' : (ai.country_fit || original.CountryFit)),\n\n    FinalDecision: normalizeFinalDecision(ai.final_decision),\n    PipelineStage: resolvePipelineStageFromVerified(normalizeFinalDecision(ai.final_decision)),\n\n    ParseError: '',\n\n    DedupeKey: original.DedupeKey && original.DedupeKey !== '||'\n      ? original.DedupeKey\n      : (\n          ai.dedupe_key ||\n          ai.job_id ||\n          original.JobId ||\n          `${original.Company || ai.company || ''}|${original.Role || ai.role || ''}|${ai.location || original.Location || ''}`.toLowerCase()\n        )\n  }\n};"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -892,9 +1436,82 @@
       "main": [
         [
           {
+            "node": "DEV - Inject Low Preview Test Job",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "DEV - Inject Low Preview Test Job": {
+      "main": [
+        [
+          {
+            "node": "Policy Engine",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Policy Engine": {
+      "main": [
+        [
+          {
+            "node": "AI - Preview Score Job",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI - Preview Score Job": {
+      "main": [
+        [
+          {
+            "node": "Preview Score Job",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preview Score Job": {
+      "main": [
+        [
+          {
+            "node": "Check Preview Threshold",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Preview Threshold": {
+      "main": [
+        [
+          {
             "node": "Check Location Eligibility",
             "type": "main",
             "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Build Preview Reject Record",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Preview Reject Record": {
+      "main": [
+        [
+          {
+            "node": "Merge Final Records",
+            "type": "main",
+            "index": 1
           }
         ]
       ]
@@ -903,7 +1520,61 @@
       "main": [
         [
           {
+            "node": "DEV Config - Gmail Input Selection",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "DEV Config - Gmail Input Selection": {
+      "main": [
+        [
+          {
+            "node": "Build Gmail Fetch Plan",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Gmail Fetch Plan": {
+      "main": [
+        [
+          {
+            "node": "Switch Gmail Fetch Mode",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch Gmail Fetch Mode": {
+      "main": [
+        [
+          {
             "node": "Gmail - Read Job Alert Emails",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Gmail - Get Email By ID (DEV)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Gmail - Read By Date Range (DEV)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Gmail - Search Emails (DEV)",
             "type": "main",
             "index": 0
           }
@@ -911,6 +1582,50 @@
       ]
     },
     "Gmail - Read Job Alert Emails": {
+      "main": [
+        [
+          {
+            "node": "Normalize Email Metadata",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gmail - Get Email By ID (DEV)": {
+      "main": [
+        [
+          {
+            "node": "Normalize Email Metadata",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gmail - Search Emails (DEV)": {
+      "main": [
+        [
+          {
+            "node": "Normalize Email Metadata",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gmail - Read By Date Range (DEV)": {
+      "main": [
+        [
+          {
+            "node": "Normalize Email Metadata",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Email Metadata": {
       "main": [
         [
           {
