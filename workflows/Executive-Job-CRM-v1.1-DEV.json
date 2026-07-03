@@ -1380,6 +1380,20 @@
       ],
       "id": "6cdadb09-d78c-4e11-aa21-5c0b95183d51",
       "name": "Normalize Verified Review"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "// Pre-extraction filter: skip LinkedIn digest / non-job-alert emails (no AI cost, no sheet row).\nconst DIGEST_SUBJECT_PATTERNS = [\n  /^\\s*jobs\\s+similar\\s+to\\s+your\\s+alert\\b/i,\n  /\\bjobs\\s+similar\\s+to\\s+your\\s+(?:job\\s+)?alert\\b/i,\n  /\\bsimilar\\s+jobs\\s+(?:you\\s+may\\s+be\\s+interested|based\\s+on)\\b/i,\n  /\\bpeople\\s+also\\s+viewed\\b/i,\n  /\\brecommended\\s+jobs\\s+for\\s+you\\b/i,\n];\nconst isDigestSubject = (subject) => {\n  const s = String(subject || '').trim();\n  if (!s) return false;\n  return DIGEST_SUBJECT_PATTERNS.some((re) => re.test(s));\n};\nconst kept = [];\nfor (const item of $input.all()) {\n  const subject = item.json.EmailSubject || item.json.Subject || '';\n  if (isDigestSubject(subject)) continue;\n  kept.push({ json: { ...item.json, DigestEmailSkipped: false } });\n}\nreturn kept;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        688,
+        640
+      ],
+      "id": "filter-digest-emails-emea-001",
+      "name": "Filter Skip Digest Emails"
     }
   ],
   "pinData": {
@@ -1648,6 +1662,17 @@
       ]
     },
     "Normalize Email Content": {
+      "main": [
+        [
+          {
+            "node": "Filter Skip Digest Emails",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter Skip Digest Emails": {
       "main": [
         [
           {
