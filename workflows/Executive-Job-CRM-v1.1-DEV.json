@@ -1475,6 +1475,55 @@
       ],
       "id": "dev-score-path-regression-emea-001",
       "name": "DEV - Inject Score Path Regression Case"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "emea-has-job-cards",
+              "leftValue": "={{ $json.ExtractionStatus !== \"NO_JOB_CARD\" }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1184,
+        640
+      ],
+      "id": "check-job-cards-emea-001",
+      "name": "Check Job Cards Extracted"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// Internal NO_JOB_CARD diagnostic only — not wired to Merge/Sheets. Gate Append blocks empty Company/Role.\nreturn {\n  json: {\n    ...$json,\n    ExtractionStatus: 'NO_JOB_CARD',\n    PipelineStage: 'NO_JOB_CARD',\n    Recommendation: 'NO',\n    Apply: 'NO',\n    Status: 'Rejected',\n    NeedsEnrichment: false,\n    Reason: $json.Reason || $json.ExtractionError || 'AI Extract returned no job cards',\n    RejectReason: $json.RejectReason || $json.ExtractionError || 'AI Extract returned no job cards',\n    MainRisk: $json.MainRisk || 'No job card parsed from email',\n    VerifiedScore: '',\n    VerifiedRecommendation: '',\n    VerifiedRisk: '',\n    VerifiedWhyApply: '',\n    FinalCV: '',\n    PreviewScore: '',\n    PreviewRecommendation: '',\n    PreviewReason: '',\n    PreviewRisk: '',\n    PreviewCV: '',\n  },\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1184,
+        480
+      ],
+      "id": "build-no-job-card-emea-001",
+      "name": "Build No Job Card Record"
     }
   ],
   "pinData": {
@@ -1564,12 +1613,33 @@
       "main": [
         [
           {
-            "node": "Policy Engine",
+            "node": "Check Job Cards Extracted",
             "type": "main",
             "index": 0
           }
         ]
       ]
+    },
+    "Check Job Cards Extracted": {
+      "main": [
+        [
+          {
+            "node": "Policy Engine",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Build No Job Card Record",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build No Job Card Record": {
+      "main": []
     },
     "Policy Engine": {
       "main": [
