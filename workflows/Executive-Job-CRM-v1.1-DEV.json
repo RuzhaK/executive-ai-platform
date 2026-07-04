@@ -16,6 +16,22 @@
     },
     {
       "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "// DEV-ONLY: cap extracted job cards per workflow run when TestMode=true.\n// TestMaxResults limits Gmail messages; MaxJobCards limits cards after Parse Job Cards.\nconst asBool = (v) => v === true || v === 'true' || v === 1;\nconst devConfig = $('DEV Config - Gmail Input Selection').first().json || {};\n\nif (!asBool(devConfig.TestMode)) {\n  return $input.all();\n}\n\nconst maxJobCards = Number(devConfig.MaxJobCards);\nif (!Number.isFinite(maxJobCards) || maxJobCards < 1) {\n  return $input.all();\n}\n\nconst cap = Math.max(1, Math.floor(maxJobCards));\nconst staticData = $getWorkflowStaticData('global');\nconst runKey = String($execution.id || 'dev');\n\nif (staticData.devJobCardCapRunKey !== runKey) {\n  staticData.devJobCardCapRunKey = runKey;\n  staticData.devJobCardCapCount = 0;\n}\n\nif (staticData.devJobCardCapCount >= cap) {\n  return [];\n}\n\nconst passed = [];\nfor (const item of $input.all()) {\n  if (staticData.devJobCardCapCount >= cap) break;\n  staticData.devJobCardCapCount += 1;\n  passed.push({\n    json: {\n      ...item.json,\n      DevJobCardCapApplied: true,\n      DevJobCardCapLimit: cap,\n      DevJobCardCapIndex: staticData.devJobCardCapCount,\n    },\n  });\n}\n\nreturn passed;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1264,
+        640
+      ],
+      "id": "dev-cap-max-jobcards-emea-001",
+      "name": "DEV - Cap Max Job Cards",
+      "notesInFlow": true,
+      "notes": "DEV ONLY — applies MaxJobCards from DEV Config when TestMode=true.\nPass-through when TestMode=false (production).\nSet MaxJobCards in DEV Config (default 1). Scale: 1 → 10 → 50."
+    },
+    {
+      "parameters": {
         "jsCode": "// DEV-ONLY: set to true to inject a low-fit mock job and bypass Gmail parse output.\n// Must remain false for normal DEV/production runs.\nconst DEV_TEST_MODE_ENABLED = false;\n\nif (!DEV_TEST_MODE_ENABLED) {\n  return $input.all();\n}\n\nreturn [\n  {\n    json: {\n      EmailId: 'test-low-fit-email',\n      ThreadId: 'test-low-fit-thread',\n      EmailReceived: String(Date.now()),\n      EmailSubject: 'TEST low fit job',\n      EmailSnippet: 'Entry-level customer support role in the United States, on-site.',\n      Role: 'Junior Customer Support Agent',\n      Company: 'Test Company',\n      Location: 'United States · On-site',\n      URL: 'https://example.com/test-job',\n      JobUrl: 'https://example.com/test-job',\n      JobId: '',\n      WorkType: 'Onsite',\n      Source: 'TEST',\n      Status: 'New',\n      Notes: '',\n      ParseError: '',\n      DedupeKey: 'test-low-fit-job',\n      LocationAllowed: false,\n      LocationRejectReason: 'Country-specific or non-Bulgaria location rejected.',\n      DevTestMode: true,\n      DevTestCase: 'LOW_PREVIEW_SCORE',\n    },\n  },\n];"
       },
       "type": "n8n-nodes-base.code",
@@ -241,6 +257,12 @@
               "type": "number"
             },
             {
+              "id": "dev-gmail-max-job-cards",
+              "name": "MaxJobCards",
+              "value": 1,
+              "type": "number"
+            },
+            {
               "id": "dev-http-delay-ms",
               "name": "HttpDelayMs",
               "value": 3000,
@@ -265,7 +287,7 @@
       "id": "f1e2d3c4-b5a6-7890-gmail-devcfg01",
       "name": "DEV Config - Gmail Input Selection",
       "notesInFlow": true,
-      "notes": "DEV ONLY — Gmail input selection\n\nDefault regression configuration (editable at runtime):\n  TestMode = true\n  TestLabel = jobs-exec-crm-regression\n  FetchMode = search\n  TestMaxResults / Limit = 10 (smoke: set TestMaxResults = 1)\n  TestResult = 1 (documentation default for first smoke run)\n  TestEmailId = empty\n  TestSubjectContains = empty\n\nPriority when TestMode=true:\n1. TestEmailId → exact message (limit 1)\n2. TestLabel → Gmail search by label (ignores TestReceivedAfter/Before)\n3. Else → date/subject search + Jobs/LinkedIn label\n\nExpected Gmail query: label:jobs-exec-crm-regression\nScale regression: TestMaxResults = 1 → 10 → 50\n\nProduction override: TestMode=false (label Jobs/LinkedIn, limit 1)\n\nLinkedIn HTTP throttling (Phase 2 enrichment):\n  HttpDelayMs = 2000–5000 (default 3000)\n  MaxConcurrentHttpRequests = 1"
+      "notes": "DEV ONLY — Gmail input selection\n\nDefault regression configuration (editable at runtime):\n  TestMode = true\n  TestLabel = jobs-exec-crm-regression\n  FetchMode = search\n  TestMaxResults = 10 (Gmail messages fetched)\n  MaxJobCards = 1 (job cards processed after Parse Job Cards)\n  Limit / TestResult = documentation fields (not wired to fetch)\n  TestEmailId = empty\n  TestSubjectContains = empty\n\nRegression scale (independent limits):\n  TestMaxResults: 1 → 10 → 50 (emails)\n  MaxJobCards: 1 → 10 → 50 (extracted job cards)\n\nPriority when TestMode=true:\n1. TestEmailId → exact message (limit 1)\n2. TestLabel → Gmail search by label (ignores TestReceivedAfter/Before)\n3. Else → date/subject search + Jobs/LinkedIn label\n\nExpected Gmail query: label:jobs-exec-crm-regression\n\nProduction override: TestMode=false (label Jobs/LinkedIn, limit 1; MaxJobCards ignored)\n\nLinkedIn HTTP throttling (Phase 2 enrichment):\n  HttpDelayMs = 2000–5000 (default 3000)\n  MaxConcurrentHttpRequests = 1"
     },
     {
       "parameters": {
@@ -1506,6 +1528,17 @@
   },
   "connections": {
     "Parse Job Cards": {
+      "main": [
+        [
+          {
+            "node": "DEV - Cap Max Job Cards",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "DEV - Cap Max Job Cards": {
       "main": [
         [
           {
