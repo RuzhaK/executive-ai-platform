@@ -177,7 +177,7 @@
             {
               "id": "dev-gmail-test-mode",
               "name": "TestMode",
-              "value": false,
+              "value": true,
               "type": "boolean"
             },
             {
@@ -190,6 +190,12 @@
               "id": "dev-gmail-test-thread-id",
               "name": "TestThreadId",
               "value": "",
+              "type": "string"
+            },
+            {
+              "id": "dev-gmail-fetch-mode",
+              "name": "FetchMode",
+              "value": "search",
               "type": "string"
             },
             {
@@ -207,7 +213,7 @@
             {
               "id": "dev-gmail-test-label",
               "name": "TestLabel",
-              "value": "",
+              "value": "jobs-exec-crm-regression",
               "type": "string"
             },
             {
@@ -217,9 +223,21 @@
               "type": "string"
             },
             {
+              "id": "dev-gmail-test-result",
+              "name": "TestResult",
+              "value": 1,
+              "type": "number"
+            },
+            {
+              "id": "dev-gmail-limit",
+              "name": "Limit",
+              "value": 10,
+              "type": "number"
+            },
+            {
               "id": "dev-gmail-test-max-results",
               "name": "TestMaxResults",
-              "value": 1,
+              "value": 10,
               "type": "number"
             },
             {
@@ -247,7 +265,7 @@
       "id": "f1e2d3c4-b5a6-7890-gmail-devcfg01",
       "name": "DEV Config - Gmail Input Selection",
       "notesInFlow": true,
-      "notes": "DEV ONLY — Gmail input selection\n\nEdit fields here (no code changes):\n• TestMode=false → production behavior (label Jobs/LinkedIn, limit 1)\n• TestMode=true → deterministic test fetch\n\nPriority when TestMode=true:\n1. TestEmailId → exact message (limit 1)\n2. TestLabel → Gmail search by label (ignores TestReceivedAfter/Before)\n3. Else → date/subject search + Jobs/LinkedIn label\n\nTestLabel: e.g. jobs-test-emea (leave empty to use date/subject window)\nTestReceivedAfter/Before: ISO datetime e.g. 2026-06-01T00:00:00.000Z\nTestMaxResults: default 1\n\nTEST-EMEA regression mode:\n  TestMode = true\n  TestLabel = jobs-test-emea\n  TestMaxResults = 5 / 20 / 50\n  Expected Gmail query: label:jobs-test-emea\n\nLinkedIn HTTP throttling (Phase 2 enrichment):\n  HttpDelayMs = 2000–5000 (default 3000)\n  MaxConcurrentHttpRequests = 1\n\nSet TestMode=false before normal runs."
+      "notes": "DEV ONLY — Gmail input selection\n\nDefault regression configuration (editable at runtime):\n  TestMode = true\n  TestLabel = jobs-exec-crm-regression\n  FetchMode = search\n  TestMaxResults / Limit = 10 (smoke: set TestMaxResults = 1)\n  TestResult = 1 (documentation default for first smoke run)\n  TestEmailId = empty\n  TestSubjectContains = empty\n\nPriority when TestMode=true:\n1. TestEmailId → exact message (limit 1)\n2. TestLabel → Gmail search by label (ignores TestReceivedAfter/Before)\n3. Else → date/subject search + Jobs/LinkedIn label\n\nExpected Gmail query: label:jobs-exec-crm-regression\nScale regression: TestMaxResults = 1 → 10 → 50\n\nProduction override: TestMode=false (label Jobs/LinkedIn, limit 1)\n\nLinkedIn HTTP throttling (Phase 2 enrichment):\n  HttpDelayMs = 2000–5000 (default 3000)\n  MaxConcurrentHttpRequests = 1"
     },
     {
       "parameters": {
@@ -693,8 +711,8 @@
         "documentId": {
           "__rl": true,
           "value": "1UikquDerfPU6G9IpN7rQvHbhUC2c3l78UksOsQ52YuM",
-          "mode": "list",
-          "cachedResultName": "Executive Job CRM",
+          "mode": "id",
+          "cachedResultName": "Executive Job CRM - EMEA DEV",
           "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1UikquDerfPU6G9IpN7rQvHbhUC2c3l78UksOsQ52YuM/edit?usp=drivesdk"
         },
         "sheetName": {
