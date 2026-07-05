@@ -96,7 +96,7 @@
     {
       "parameters": {
         "mode": "runOnceForEachItem",
-        "jsCode": "// Preview gate threshold — change PreviewScoreThreshold here only (default 7).\n// PREVIEW STAGE FIELDS (email card only): PreviewScore, PreviewRecommendation, PreviewReason, PreviewRisk, PreviewCV\n// Do not write Score or VerifiedScore here.\nconst PreviewScoreThreshold = 7;\n\nconst base = $('Policy Engine').item?.json || {};\n\nconst allowedCvs = [\n  'COO CV',\n  'GTM & Commercial Operations CV',\n  'Strategy & Operations CV',\n  'AI Transformation CV',\n  'Project / Program Leadership CV',\n];\n\nconst normalizeCv = (cv) => {\n  const value = String(cv || '').trim();\n  return allowedCvs.includes(value) ? value : 'Strategy & Operations CV';\n};\n\nconst clampScore = (score) => {\n  const n = Number(score);\n  if (!Number.isFinite(n)) return 0;\n  return Math.max(0, Math.min(10, Math.round(n)));\n};\n\nconst looksLikeLocationDecision = (text) => {\n  const t = String(text || '').toLowerCase();\n  if (!t.trim()) return false;\n  return (\n    /remote not acceptable|not acceptable for|country-specific remote|country specific remote|work authorization|residents only|uk remote|united kingdom remote|spain remote|netherlands remote|france remote|italy remote|bulgaria allowed|non-bulgaria|location reject|relocation required|outside bulgaria/.test(t) &&\n    !/role|seniority|function|company|executive|coo|operations|transformation|junior|support/.test(t)\n  );\n};\n\nconst sanitizePreviewText = (text, fallback) => {\n  const value = String(text || '').trim();\n  if (!value) return fallback;\n  return looksLikeLocationDecision(value) ? fallback : value;\n};\n\nconst skipPreview =\n  base.ExtractionStatus === 'NO_JOB_CARD' ||\n  (!String(base.Role || '').trim() && !String(base.Company || '').trim());\n\nif (skipPreview) {\n  return {\n    json: {\n      ...base,\n      PreviewScore: 0,\n      PreviewRecommendation: 'NO',\n      PreviewReason: base.ExtractionError || base.RejectReason || 'No job card parsed from email',\n      PreviewRisk: base.MainRisk || 'No job card parsed from email',\n      PreviewCV: 'Strategy & Operations CV',\n      PreviewScoreThreshold,\n      PreviewPassesThreshold: false,\n      PipelineStage: 'NO_JOB_CARD',\n    },\n  };\n}\n\nconst raw =\n  $json.output?.[0]?.content?.[0]?.text ||\n  $json.output?.[0]?.text ||\n  $json.content?.[0]?.text ||\n  $json.text ||\n  '';\n\nconst clean = String(raw)\n  .replace(/```json/gi, '')\n  .replace(/```/g, '')\n  .trim();\n\nlet ai = {};\n\ntry {\n  ai = JSON.parse(clean);\n} catch (e) {\n  ai = {};\n}\n\nconst previewScore = clampScore(ai.preview_score);\nconst previewPassesThreshold = previewScore >= PreviewScoreThreshold;\n\nconst normalizePreviewRecommendation = (rec, score, threshold) => {\n  let value = String(rec || '').trim().toUpperCase();\n  if (!['YES', 'MONITOR', 'NO'].includes(value)) {\n    if (score >= threshold) value = 'YES';\n    else if (score >= 5) value = 'MONITOR';\n    else value = 'NO';\n  }\n  if (value === 'YES' && score < threshold) value = 'MONITOR';\n  return value;\n};\n\nconst previewRecommendation = normalizePreviewRecommendation(\n  ai.preview_recommendation,\n  previewScore,\n  PreviewScoreThreshold,\n);\n\nconst previewReason = sanitizePreviewText(\n  ai.preview_reason,\n  'Card-level role/seniority fit assessed; location eligibility deferred to full job read.',\n);\nconst previewRisk = sanitizePreviewText(\n  ai.preview_risk,\n  'Location eligibility unknown from email card; verify after full LinkedIn posting read.',\n);\n\nreturn {\n  json: {\n    ...base,\n    PreviewScore: previewScore,\n    PreviewRecommendation: previewRecommendation,\n    PreviewReason: previewReason,\n    PreviewRisk: previewRisk,\n    PreviewCV: normalizeCv(ai.preview_cv),\n    PreviewScoreThreshold,\n    PreviewPassesThreshold: previewPassesThreshold,\n  },\n};"
+        "jsCode": "// Preview gate threshold — change PreviewScoreThreshold here only (default 7).\n// PREVIEW STAGE FIELDS (email card only): PreviewScore, PreviewRecommendation, PreviewReason, PreviewRisk, PreviewCV\n// Do not write Score or VerifiedScore here.\nconst PreviewScoreThreshold = 7;\nconst VerifiedScoreThreshold = 7;\n\nconst base = $('Policy Engine').item?.json || {};\n\nconst allowedCvs = [\n  'COO CV',\n  'GTM & Commercial Operations CV',\n  'Strategy & Operations CV',\n  'AI Transformation CV',\n  'Project / Program Leadership CV',\n];\n\nconst normalizeCv = (cv) => {\n  const value = String(cv || '').trim();\n  return allowedCvs.includes(value) ? value : 'Strategy & Operations CV';\n};\n\nconst clampScore = (score) => {\n  const n = Number(score);\n  if (!Number.isFinite(n)) return 0;\n  return Math.max(0, Math.min(10, Math.round(n)));\n};\n\nconst looksLikeLocationDecision = (text) => {\n  const t = String(text || '').toLowerCase();\n  if (!t.trim()) return false;\n  return (\n    /remote not acceptable|not acceptable for|country-specific remote|country specific remote|work authorization|residents only|uk remote|united kingdom remote|spain remote|netherlands remote|france remote|italy remote|bulgaria allowed|non-bulgaria|location reject|relocation required|outside bulgaria/.test(t) &&\n    !/role|seniority|function|company|executive|coo|operations|transformation|junior|support/.test(t)\n  );\n};\n\nconst sanitizePreviewText = (text, fallback) => {\n  const value = String(text || '').trim();\n  if (!value) return fallback;\n  return looksLikeLocationDecision(value) ? fallback : value;\n};\n\nconst skipPreview =\n  base.ExtractionStatus === 'NO_JOB_CARD' ||\n  (!String(base.Role || '').trim() && !String(base.Company || '').trim());\n\nif (skipPreview) {\n  return {\n    json: {\n      ...base,\n      PreviewScore: 0,\n      PreviewRecommendation: 'NO',\n      PreviewReason: base.ExtractionError || base.RejectReason || 'No job card parsed from email',\n      PreviewRisk: base.MainRisk || 'No job card parsed from email',\n      PreviewCV: 'Strategy & Operations CV',\n      PreviewScoreThreshold,\n      VerifiedScoreThreshold,\n      PreviewPassesThreshold: false,\n      PipelineStage: 'NO_JOB_CARD',\n    },\n  };\n}\n\nconst raw =\n  $json.output?.[0]?.content?.[0]?.text ||\n  $json.output?.[0]?.text ||\n  $json.content?.[0]?.text ||\n  $json.text ||\n  '';\n\nconst clean = String(raw)\n  .replace(/```json/gi, '')\n  .replace(/```/g, '')\n  .trim();\n\nlet ai = {};\n\ntry {\n  ai = JSON.parse(clean);\n} catch (e) {\n  ai = {};\n}\n\nconst previewScore = clampScore(ai.preview_score);\nconst previewPassesThreshold = previewScore >= PreviewScoreThreshold;\n\nconst normalizePreviewRecommendation = (rec, score, threshold) => {\n  let value = String(rec || '').trim().toUpperCase();\n  if (!['YES', 'MONITOR', 'NO'].includes(value)) {\n    if (score >= threshold) value = 'YES';\n    else if (score >= 5) value = 'MONITOR';\n    else value = 'NO';\n  }\n  if (value === 'YES' && score < threshold) value = 'MONITOR';\n  return value;\n};\n\nconst previewRecommendation = normalizePreviewRecommendation(\n  ai.preview_recommendation,\n  previewScore,\n  PreviewScoreThreshold,\n);\n\nconst previewReason = sanitizePreviewText(\n  ai.preview_reason,\n  'Card-level role/seniority fit assessed; location eligibility deferred to full job read.',\n);\nconst previewRisk = sanitizePreviewText(\n  ai.preview_risk,\n  'Location eligibility unknown from email card; verify after full LinkedIn posting read.',\n);\n\nreturn {\n  json: {\n    ...base,\n    PreviewScore: previewScore,\n    PreviewRecommendation: previewRecommendation,\n    PreviewReason: previewReason,\n    PreviewRisk: previewRisk,\n    PreviewCV: normalizeCv(ai.preview_cv),\n    PreviewScoreThreshold,\n    VerifiedScoreThreshold,\n    PreviewPassesThreshold: previewPassesThreshold,\n  },\n};"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -621,7 +621,7 @@
     {
       "parameters": {
         "mode": "runOnceForEachItem",
-        "jsCode": "// INITIAL EVAL (internal routing only): InitialEvalScore, InitialEvalRecommendation, InitialEvalCV.\n// Do not set Score, VerifiedScore, or overwrite Preview* fields here.\nconst email = $('Parse Job Cards').item?.json || {};\nconst preview = $('Preview Score Job').item?.json || {};\nconst emailFields = {\n  EmailId: email.EmailId || preview.EmailId || '',\n  ThreadId: email.ThreadId || preview.ThreadId || '',\n  EmailReceived: email.EmailReceived || preview.EmailReceived || '',\n  EmailSubject: email.EmailSubject || preview.EmailSubject || '',\n  EmailSnippet: email.EmailSnippet || preview.EmailSnippet || '',\n  TestMode: email.TestMode ?? preview.TestMode ?? '',\n  TestLabelUsed: email.TestLabelUsed ?? preview.TestLabelUsed ?? '',\n  GmailLabels: email.GmailLabels ?? preview.GmailLabels ?? '',\n};\nconst previewFields = {\n  PreviewScore: preview.PreviewScore ?? '',\n  PreviewRecommendation: preview.PreviewRecommendation || '',\n  PreviewReason: preview.PreviewReason || '',\n  PreviewRisk: preview.PreviewRisk || '',\n  PreviewCV: preview.PreviewCV || '',\n  PreviewScoreThreshold: preview.PreviewScoreThreshold ?? 7,\n};\n\nconst isCountrySpecificRemote = (location, workType = '') => {\n  const loc = String(location || '').toLowerCase().trim();\n  const wt = String(workType || '').toLowerCase().trim();\n  const hasRemote = wt === 'remote' || /\\bremote\\b/.test(loc);\n  if (!hasRemote) return false;\n  if (/remote europe|remote emea|remote worldwide|remote global|bulgaria/.test(loc)) return false;\n  if (loc.includes('· remote')) return true;\n  return /\\b(united kingdom|uk|spain|netherlands|france|germany|italy|portugal|switzerland)\\b/.test(loc);\n};\n\nconst looksLikeCardLocationRejection = (text) => {\n  const t = String(text || '').toLowerCase();\n  return /country-specific|not acceptable|residents only|work authorization|outside bulgaria|uk remote|united kingdom remote|spain remote|netherlands remote|france remote|germany remote|location mismatch|location reject/.test(t);\n};\n\nconst LOCATION_REVIEW_MSG = 'Location eligibility requires full posting verification.';\n\nconst clampInterviewProbability = (value) => {\n  const n = Number(value);\n  if (!Number.isFinite(n)) return 0;\n  const pct = n >= 0 && n <= 10 ? Math.round(n * 10) : Math.round(n);\n  return Math.max(0, Math.min(100, pct));\n};\n\nconst normalizeTriFit = (value, fallback = 'PARTIAL') => {\n  const v = String(value || '').trim().toUpperCase();\n  if (v === 'FULL MATCH' || v === 'FULL_MATCH') return 'FULL MATCH';\n  if (v === 'PARTIAL') return 'PARTIAL';\n  if (v === 'WEAK') return 'WEAK';\n  return fallback;\n};\n\nconst normalizeGeoFit = (value, fallback = 'REVIEW_REQUIRED') => {\n  const v = String(value || '').trim().toUpperCase();\n  if (v === 'FULL MATCH' || v === 'FULL_MATCH') return 'FULL MATCH';\n  if (v === 'REVIEW_REQUIRED') return 'REVIEW_REQUIRED';\n  if (v === 'MISMATCH') return 'MISMATCH';\n  return fallback;\n};\n\nconst normalizeRecommendation = (value, fallback = 'NO') => {\n  const v = String(value || '').trim().toUpperCase();\n  if (['YES', 'MONITOR', 'NO'].includes(v)) return v;\n  return fallback;\n};\n\nconst normalizePriority = (value, fallback = 'LOW') => {\n  const v = String(value || '').trim().toUpperCase();\n  if (['HIGH', 'MEDIUM', 'LOW'].includes(v)) return v;\n  return fallback;\n};\n\nconst sanitizeInitialEvalLocation = (ai, location, workType, previewCtx) => {\n  if (!isCountrySpecificRemote(location, workType)) return ai;\n  const out = { ...ai };\n  const hadLocationReject =\n    ['NO', 'MISMATCH'].includes(String(out.country_fit || '').toUpperCase()) ||\n    ['NO', 'MISMATCH'].includes(String(out.location_fit || '').toUpperCase()) ||\n    ['NO', 'MISMATCH'].includes(String(out.remote_fit || '').toUpperCase()) ||\n    looksLikeCardLocationRejection(out.main_risk);\n\n  out.country_fit = 'REVIEW_REQUIRED';\n  out.location_fit = 'REVIEW_REQUIRED';\n  if (['NO', 'MISMATCH', 'UNKNOWN', ''].includes(String(out.remote_fit || '').toUpperCase())) {\n    out.remote_fit = 'REVIEW_REQUIRED';\n  }\n\n  if (hadLocationReject || looksLikeCardLocationRejection(out.main_risk) || !String(out.main_risk || '').trim()) {\n    out.main_risk = LOCATION_REVIEW_MSG;\n  }\n\n  if (hadLocationReject) {\n    const score = Number(out.score);\n    const previewScore = Number(previewCtx.PreviewScore);\n    const floor = Number.isFinite(previewScore) ? Math.max(previewScore, 7) : 7;\n    if (Number.isFinite(score) && score < 7) out.score = Math.max(score, floor);\n    if (String(out.recommendation || '').toUpperCase() === 'NO') out.recommendation = 'YES';\n  }\n\n  return out;\n};\n\nconst raw =\n  $json.output?.[0]?.content?.[0]?.text ||\n  $json.output?.[0]?.text ||\n  $json.content?.[0]?.text ||\n  $json.text ||\n  '';\n\nconst clean = String(raw)\n  .replace(/```json/gi, '')\n  .replace(/```/g, '')\n  .trim();\n\nlet ai;\n\ntry {\n  ai = JSON.parse(clean);\n} catch (e) {\n  return {\n    json: {\n      ...emailFields,\n      ...previewFields,\n      Role: '',\n      Company: '',\n      JobId: '',\n      Location: 'Not specified',\n      WorkType: '',\n      URL: '',\n      Source: 'LinkedIn',\n      Status: 'AI Parse Error',\n      Notes: '',\n      DedupeKey: '',\n\n      InitialEvalScore: 0,\n      InterviewProbability: 0,\n      InitialEvalCV: 'Strategy & Operations CV',\n      InitialEvalRecommendation: 'NO',\n      RemoteFit: 'REVIEW_REQUIRED',\n      CountryFit: 'REVIEW_REQUIRED',\n      LocationFit: 'REVIEW_REQUIRED',\n      SeniorityFit: 'WEAK',\n      SectorFit: 'WEAK',\n      Priority: 'LOW',\n      WhyApply: '',\n      MainRisk: 'AI returned invalid JSON.',\n      ParseError: e.message\n    }\n  };\n}\n\nconst jobContext = $('Policy Engine').item?.json || {};\nai = sanitizeInitialEvalLocation(\n  ai,\n  ai.location || jobContext.Location || '',\n  ai.work_type || jobContext.WorkType || '',\n  preview,\n);\n\nconst role = ai.role || '';\nconst company = ai.company || '';\nconst jobId = ai.job_id || '';\nconst location = ai.location || 'Not specified';\nconst workType = ai.work_type || '';\nconst url = ai.url || '';\nconst dedupeKey = ai.dedupe_key || (jobId || `${company}|${role}|${location}`).toLowerCase();\n\nreturn {\n  json: {\n    ...emailFields,\n    ...previewFields,\n    Role: role,\n    Company: company,\n    JobId: jobId,\n    Location: location,\n    WorkType: workType,\n    URL: url,\n    Source: 'LinkedIn',\n    Status: 'New',\n    Notes: '',\n    DedupeKey: dedupeKey,\n\n    InitialEvalScore: ai.score ?? 0,\n    InterviewProbability: clampInterviewProbability(ai.interview_probability),\n    InitialEvalCV: ai.recommended_cv || 'Strategy & Operations CV',\n    InitialEvalRecommendation: normalizeRecommendation(ai.recommendation),\n    RemoteFit: normalizeGeoFit(ai.remote_fit),\n    CountryFit: normalizeGeoFit(ai.country_fit),\n    LocationFit: normalizeGeoFit(ai.location_fit),\n    SeniorityFit: normalizeTriFit(ai.seniority_fit),\n    SectorFit: normalizeTriFit(ai.sector_fit),\n    Priority: normalizePriority(ai.follow_up_priority),\n    WhyApply: ai.why_apply || '',\n    MainRisk: ai.main_risk || '',\n    ParseError: ''\n  }\n};"
+        "jsCode": "// INITIAL EVAL (internal routing only): InitialEvalScore, InitialEvalRecommendation, InitialEvalCV.\n// Do not set Score, VerifiedScore, or overwrite Preview* fields here.\nconst email = $('Parse Job Cards').item?.json || {};\nconst preview = $('Preview Score Job').item?.json || {};\nconst emailFields = {\n  EmailId: email.EmailId || preview.EmailId || '',\n  ThreadId: email.ThreadId || preview.ThreadId || '',\n  EmailReceived: email.EmailReceived || preview.EmailReceived || '',\n  EmailSubject: email.EmailSubject || preview.EmailSubject || '',\n  EmailSnippet: email.EmailSnippet || preview.EmailSnippet || '',\n  TestMode: email.TestMode ?? preview.TestMode ?? '',\n  TestLabelUsed: email.TestLabelUsed ?? preview.TestLabelUsed ?? '',\n  GmailLabels: email.GmailLabels ?? preview.GmailLabels ?? '',\n};\nconst previewFields = {\n  PreviewScore: preview.PreviewScore ?? '',\n  PreviewRecommendation: preview.PreviewRecommendation || '',\n  PreviewReason: preview.PreviewReason || '',\n  PreviewRisk: preview.PreviewRisk || '',\n  PreviewCV: preview.PreviewCV || '',\n  PreviewScoreThreshold: preview.PreviewScoreThreshold ?? 7,\n  VerifiedScoreThreshold: preview.VerifiedScoreThreshold ?? 7,\n};\n\nconst isCountrySpecificRemote = (location, workType = '') => {\n  const loc = String(location || '').toLowerCase().trim();\n  const wt = String(workType || '').toLowerCase().trim();\n  const hasRemote = wt === 'remote' || /\\bremote\\b/.test(loc);\n  if (!hasRemote) return false;\n  if (/remote europe|remote emea|remote worldwide|remote global|bulgaria/.test(loc)) return false;\n  if (loc.includes('· remote')) return true;\n  return /\\b(united kingdom|uk|spain|netherlands|france|germany|italy|portugal|switzerland)\\b/.test(loc);\n};\n\nconst looksLikeCardLocationRejection = (text) => {\n  const t = String(text || '').toLowerCase();\n  return /country-specific|not acceptable|residents only|work authorization|outside bulgaria|uk remote|united kingdom remote|spain remote|netherlands remote|france remote|germany remote|location mismatch|location reject/.test(t);\n};\n\nconst LOCATION_REVIEW_MSG = 'Location eligibility requires full posting verification.';\n\nconst clampInterviewProbability = (value) => {\n  const n = Number(value);\n  if (!Number.isFinite(n)) return 0;\n  const pct = n >= 0 && n <= 10 ? Math.round(n * 10) : Math.round(n);\n  return Math.max(0, Math.min(100, pct));\n};\n\nconst normalizeTriFit = (value, fallback = 'PARTIAL') => {\n  const v = String(value || '').trim().toUpperCase();\n  if (v === 'FULL MATCH' || v === 'FULL_MATCH') return 'FULL MATCH';\n  if (v === 'PARTIAL') return 'PARTIAL';\n  if (v === 'WEAK') return 'WEAK';\n  return fallback;\n};\n\nconst normalizeGeoFit = (value, fallback = 'REVIEW_REQUIRED') => {\n  const v = String(value || '').trim().toUpperCase();\n  if (v === 'FULL MATCH' || v === 'FULL_MATCH') return 'FULL MATCH';\n  if (v === 'REVIEW_REQUIRED') return 'REVIEW_REQUIRED';\n  if (v === 'MISMATCH') return 'MISMATCH';\n  return fallback;\n};\n\nconst normalizeRecommendation = (value, fallback = 'NO') => {\n  const v = String(value || '').trim().toUpperCase();\n  if (['YES', 'MONITOR', 'NO'].includes(v)) return v;\n  return fallback;\n};\n\nconst normalizePriority = (value, fallback = 'LOW') => {\n  const v = String(value || '').trim().toUpperCase();\n  if (['HIGH', 'MEDIUM', 'LOW'].includes(v)) return v;\n  return fallback;\n};\n\nconst sanitizeInitialEvalLocation = (ai, location, workType, previewCtx) => {\n  if (!isCountrySpecificRemote(location, workType)) return ai;\n  const out = { ...ai };\n  const hadLocationReject =\n    ['NO', 'MISMATCH'].includes(String(out.country_fit || '').toUpperCase()) ||\n    ['NO', 'MISMATCH'].includes(String(out.location_fit || '').toUpperCase()) ||\n    ['NO', 'MISMATCH'].includes(String(out.remote_fit || '').toUpperCase()) ||\n    looksLikeCardLocationRejection(out.main_risk);\n\n  out.country_fit = 'REVIEW_REQUIRED';\n  out.location_fit = 'REVIEW_REQUIRED';\n  if (['NO', 'MISMATCH', 'UNKNOWN', ''].includes(String(out.remote_fit || '').toUpperCase())) {\n    out.remote_fit = 'REVIEW_REQUIRED';\n  }\n\n  if (hadLocationReject || looksLikeCardLocationRejection(out.main_risk) || !String(out.main_risk || '').trim()) {\n    out.main_risk = LOCATION_REVIEW_MSG;\n  }\n\n  if (hadLocationReject) {\n    const score = Number(out.score);\n    const previewScore = Number(previewCtx.PreviewScore);\n    const floor = Number.isFinite(previewScore) ? Math.max(previewScore, 7) : 7;\n    if (Number.isFinite(score) && score < 7) out.score = Math.max(score, floor);\n    if (String(out.recommendation || '').toUpperCase() === 'NO') out.recommendation = 'YES';\n  }\n\n  return out;\n};\n\nconst raw =\n  $json.output?.[0]?.content?.[0]?.text ||\n  $json.output?.[0]?.text ||\n  $json.content?.[0]?.text ||\n  $json.text ||\n  '';\n\nconst clean = String(raw)\n  .replace(/```json/gi, '')\n  .replace(/```/g, '')\n  .trim();\n\nlet ai;\n\ntry {\n  ai = JSON.parse(clean);\n} catch (e) {\n  return {\n    json: {\n      ...emailFields,\n      ...previewFields,\n      Role: '',\n      Company: '',\n      JobId: '',\n      Location: 'Not specified',\n      WorkType: '',\n      URL: '',\n      Source: 'LinkedIn',\n      Status: 'AI Parse Error',\n      Notes: '',\n      DedupeKey: '',\n\n      InitialEvalScore: 0,\n      InterviewProbability: 0,\n      InitialEvalCV: 'Strategy & Operations CV',\n      InitialEvalRecommendation: 'NO',\n      RemoteFit: 'REVIEW_REQUIRED',\n      CountryFit: 'REVIEW_REQUIRED',\n      LocationFit: 'REVIEW_REQUIRED',\n      SeniorityFit: 'WEAK',\n      SectorFit: 'WEAK',\n      Priority: 'LOW',\n      WhyApply: '',\n      MainRisk: 'AI returned invalid JSON.',\n      ParseError: e.message\n    }\n  };\n}\n\nconst jobContext = $('Policy Engine').item?.json || {};\nai = sanitizeInitialEvalLocation(\n  ai,\n  ai.location || jobContext.Location || '',\n  ai.work_type || jobContext.WorkType || '',\n  preview,\n);\n\nconst role = ai.role || '';\nconst company = ai.company || '';\nconst jobId = ai.job_id || '';\nconst location = ai.location || 'Not specified';\nconst workType = ai.work_type || '';\nconst url = ai.url || '';\nconst dedupeKey = ai.dedupe_key || (jobId || `${company}|${role}|${location}`).toLowerCase();\n\nreturn {\n  json: {\n    ...emailFields,\n    ...previewFields,\n    Role: role,\n    Company: company,\n    JobId: jobId,\n    Location: location,\n    WorkType: workType,\n    URL: url,\n    Source: 'LinkedIn',\n    Status: 'New',\n    Notes: '',\n    DedupeKey: dedupeKey,\n\n    InitialEvalScore: ai.score ?? 0,\n    InterviewProbability: clampInterviewProbability(ai.interview_probability),\n    InitialEvalCV: ai.recommended_cv || 'Strategy & Operations CV',\n    InitialEvalRecommendation: normalizeRecommendation(ai.recommendation),\n    RemoteFit: normalizeGeoFit(ai.remote_fit),\n    CountryFit: normalizeGeoFit(ai.country_fit),\n    LocationFit: normalizeGeoFit(ai.location_fit),\n    SeniorityFit: normalizeTriFit(ai.seniority_fit),\n    SectorFit: normalizeTriFit(ai.sector_fit),\n    Priority: normalizePriority(ai.follow_up_priority),\n    WhyApply: ai.why_apply || '',\n    MainRisk: ai.main_risk || '',\n    ParseError: ''\n  }\n};"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -631,40 +631,6 @@
       ],
       "id": "3ed84cf8-9267-484e-a245-310c6ae26880",
       "name": "Normalize AI Evaluation"
-    },
-    {
-      "parameters": {
-        "conditions": {
-          "options": {
-            "caseSensitive": true,
-            "leftValue": "",
-            "typeValidation": "loose",
-            "version": 3
-          },
-          "conditions": [
-            {
-              "id": "80c4bf2f-3183-494f-b399-aa7dd92bf4c1",
-              "leftValue": 7,
-              "rightValue": "={{$json.InitialEvalScore}}",
-              "operator": {
-                "type": "number",
-                "operation": "lte"
-              }
-            }
-          ],
-          "combinator": "or"
-        },
-        "looseTypeValidation": true,
-        "options": {}
-      },
-      "type": "n8n-nodes-base.if",
-      "typeVersion": 2.3,
-      "position": [
-        2400,
-        496
-      ],
-      "id": "5f90c391-a3d6-4d6e-8b8f-760733363dae",
-      "name": "Check Score Threshold"
     },
     {
       "parameters": {
@@ -1459,6 +1425,54 @@
     },
     {
       "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "emea-verified-score-threshold-cond",
+              "leftValue": "={{ Number($json.VerifiedScoreThreshold ?? 7) }}",
+              "rightValue": "={{$json.VerifiedScore}}",
+              "operator": {
+                "type": "number",
+                "operation": "lte"
+              }
+            }
+          ],
+          "combinator": "or"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        3088,
+        448
+      ],
+      "id": "emea-check-verified-score-threshold-3c",
+      "name": "Check Verified Score Threshold"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// Verified score reject only — runs on Check Verified Score Threshold FALSE branch.\nconst threshold = Number($json.VerifiedScoreThreshold ?? 7);\nconst score = Number($json.VerifiedScore);\n\nif (Number.isFinite(score) && score >= threshold) {\n  return { json: $json };\n}\n\nconst reason = 'VerifiedScore missing or below threshold.';\n\nreturn {\n  json: {\n    ...$json,\n    FinalDecision: 'REJECT',\n    PipelineStage: 'FINAL_REJECT',\n    RejectReason: reason,\n    Status: 'Low Score',\n    VerifiedRecommendation: 'NO',\n  },\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3088,
+        640
+      ],
+      "id": "emea-build-verified-score-reject-3c",
+      "name": "Build Verified Score Reject Record"
+    },
+    {
+      "parameters": {
         "mode": "runOnceForAllItems",
         "jsCode": "// Pre-extraction filter: skip LinkedIn digest / non-job-alert emails (no AI cost, no sheet row).\nconst DIGEST_SUBJECT_PATTERNS = [\n  /^\\s*jobs\\s+similar\\s+to\\s+your\\s+alert\\b/i,\n  /\\bjobs\\s+similar\\s+to\\s+your\\s+(?:job\\s+)?alert\\b/i,\n  /\\bsimilar\\s+jobs\\s+(?:you\\s+may\\s+be\\s+interested|based\\s+on)\\b/i,\n  /\\bpeople\\s+also\\s+viewed\\b/i,\n  /\\brecommended\\s+jobs\\s+for\\s+you\\b/i,\n];\nconst isDigestSubject = (subject) => {\n  const s = String(subject || '').trim();\n  if (!s) return false;\n  return DIGEST_SUBJECT_PATTERNS.some((re) => re.test(s));\n};\nconst kept = [];\nfor (const item of $input.all()) {\n  const subject = item.json.EmailSubject || item.json.Subject || '';\n  if (isDigestSubject(subject)) continue;\n  kept.push({ json: { ...item.json, DigestEmailSkipped: false } });\n}\nreturn kept;"
       },
@@ -2026,20 +2040,42 @@
         ]
       ]
     },
-    "Check Score Threshold": {
+    "Normalize Verified Review": {
       "main": [
         [
           {
-            "node": "AI - Verified Review",
+            "node": "Check Verified Score Threshold",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Verified Score Threshold": {
+      "main": [
+        [
+          {
+            "node": "Merge Final Records",
             "type": "main",
             "index": 0
           }
         ],
         [
           {
-            "node": "Build Reject Record",
+            "node": "Build Verified Score Reject Record",
             "type": "main",
             "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Verified Score Reject Record": {
+      "main": [
+        [
+          {
+            "node": "Merge Final Records",
+            "type": "main",
+            "index": 1
           }
         ]
       ]
@@ -2127,17 +2163,6 @@
         [
           {
             "node": "Build Reject Record",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Normalize Verified Review": {
-      "main": [
-        [
-          {
-            "node": "Merge Final Records",
             "type": "main",
             "index": 0
           }
