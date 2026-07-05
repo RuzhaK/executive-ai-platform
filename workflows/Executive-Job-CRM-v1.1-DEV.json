@@ -779,7 +779,7 @@
             "Location Fit": "={{ $json.LocationFit }}",
             "DedupeKey": "={{$json.DedupeKey}}",
             "RejectReason": "={{ $json.RejectReason }}",
-            "auto_reject_reason": "=",
+            "auto_reject_reason": "={{$json.auto_reject_reason}}",
             "EmailId": "={{$json.EmailId}}",
             "ThreadId": "={{$json.ThreadId}}",
             "EmailReceived": "={{$json.EmailReceived}}",
@@ -793,6 +793,9 @@
             "PreviewRisk": "={{$json.PreviewRisk}}",
             "PreviewCV": "={{$json.PreviewCV}}",
             "PipelineStage": "={{$json.PipelineStage}}",
+            "EnrichmentStatus": "={{$json.EnrichmentStatus}}",
+            "EnrichmentError": "={{$json.EnrichmentError}}",
+            "FullJobTextLength": "={{$json.FullJobTextLength}}",
             "TestMode": "={{ $json.TestMode }}",
             "TestLabelUsed": "={{ $json.TestLabelUsed }}",
             "GmailLabels": "={{ $json.GmailLabels }}"
@@ -842,7 +845,8 @@
               "defaultMatch": false,
               "display": true,
               "type": "string",
-              "canBeUsedToMatch": true
+              "canBeUsedToMatch": true,
+              "removed": true
             },
             {
               "id": "Salary Range",
@@ -869,7 +873,8 @@
               "defaultMatch": false,
               "display": true,
               "type": "string",
-              "canBeUsedToMatch": true
+              "canBeUsedToMatch": true,
+              "removed": true
             },
             {
               "id": "Industry",
@@ -878,7 +883,8 @@
               "defaultMatch": false,
               "display": true,
               "type": "string",
-              "canBeUsedToMatch": true
+              "canBeUsedToMatch": true,
+              "removed": true
             },
             {
               "id": "Score",
@@ -932,7 +938,8 @@
               "defaultMatch": false,
               "display": true,
               "type": "string",
-              "canBeUsedToMatch": true
+              "canBeUsedToMatch": true,
+              "removed": true
             },
             {
               "id": "URL",
@@ -950,7 +957,8 @@
               "defaultMatch": false,
               "display": true,
               "type": "string",
-              "canBeUsedToMatch": true
+              "canBeUsedToMatch": true,
+              "removed": true
             },
             {
               "id": "Source",
@@ -1108,7 +1116,7 @@
               "display": true,
               "type": "string",
               "canBeUsedToMatch": true,
-              "removed": false
+              "removed": true
             },
             {
               "id": "Verified Priority",
@@ -1299,6 +1307,33 @@
               "type": "string",
               "canBeUsedToMatch": true,
               "removed": false
+            },
+            {
+              "id": "EnrichmentStatus",
+              "displayName": "EnrichmentStatus",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "EnrichmentError",
+              "displayName": "EnrichmentError",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "FullJobTextLength",
+              "displayName": "FullJobTextLength",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true
             },
             {
               "id": "TestMode",
