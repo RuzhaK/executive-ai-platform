@@ -3,29 +3,28 @@
   "nodes": [
     {
       "parameters": {
-        "jsCode": "const extractRawText = (item) =>\n  item.json.output?.[0]?.content?.[0]?.text ||\n  item.json.output?.[0]?.text ||\n  item.json.content?.[0]?.text ||\n  item.json.text ||\n  item.json.response ||\n  item.json.message ||\n  '';\n\nconst extractJobId = (url) =>\n  String(url || '').match(/jobs\\/view\\/(\\d+)/)?.[1] || '';\n\nconst normalizeJobUrl = (raw) => {\n  const jobId = extractJobId(raw);\n  return jobId ? `https://www.linkedin.com/jobs/view/${jobId}` : String(raw || '').trim();\n};\n\nconst locationAllowed = (location, workType = '') => {\n  const loc = String(location || '').toLowerCase().trim();\n  const wt = String(workType || '').toLowerCase().trim();\n\n  if (/relocation|relocate\\s*required/.test(loc)) return false;\n\n  if (loc.includes('bulgaria')) return true;\n\n  if (\n    loc.includes('remote europe') ||\n    loc.includes('remote emea') ||\n    loc.includes('emea · remote') ||\n    loc.includes('europe · remote') ||\n    loc.includes('remote worldwide') ||\n    loc.includes('remote global')\n  ) {\n    return true;\n  }\n\n  const hasRemote = wt === 'remote' || /\\bremote\\b/.test(loc);\n  const hasHybrid = wt === 'hybrid' || /\\bhybrid\\b/.test(loc);\n  const hasOnsite =\n    wt === 'onsite' || wt === 'on-site' || /\\bon-?site\\b/.test(loc) || /\\bonsite\\b/.test(loc);\n\n  // Country-specific remote — pass early gate; verify after full job read\n  if (hasRemote && loc.includes('· remote')) return true;\n\n  // Unqualified remote — pass early gate\n  if (hasRemote && !hasHybrid && !hasOnsite) return true;\n\n  if (hasHybrid && !loc.includes('bulgaria')) return false;\n\n  if (hasOnsite && !loc.includes('bulgaria')) return false;\n\n  if (!hasRemote && !loc.includes('bulgaria')) {\n    const nonRemoteCountries = [\n      'united kingdom', 'netherlands', 'spain', 'france', 'italy',\n      'germany', 'portugal', 'switzerland', 'united states',\n    ];\n    if (nonRemoteCountries.some((c) => loc.includes(c))) return false;\n  }\n\n  return true;\n};\n\nconst locationRejectReason = (location, workType, allowed) => {\n  if (allowed) return '';\n  const loc = String(location || '').toLowerCase().trim();\n  const wt = String(workType || '').toLowerCase().trim();\n  if (/relocation|relocate\\s*required/.test(loc)) return 'Relocation required.';\n  if ((/\\bhybrid\\b/.test(loc) || wt === 'hybrid') && !loc.includes('bulgaria')) {\n    return 'Hybrid outside Bulgaria rejected.';\n  }\n  if ((/\\bon-?site\\b/.test(loc) || /\\bonsite\\b/.test(loc) || wt === 'onsite') && !loc.includes('bulgaria')) {\n    return 'On-site outside Bulgaria rejected.';\n  }\n  return 'Non-remote location outside Bulgaria rejected.';\n};\n\nconst looksFakeCompany = (company, role) => {\n  const c = String(company || '').toLowerCase().trim();\n  const r = String(role || '').toLowerCase().trim();\n\n  if (!c) return true;\n  if (c === r) return true;\n\n  const blockedExactCompanies = [\n    'remote',\n    'hybrid',\n    'onsite',\n    'on-site',\n    'on site',\n    'full-time',\n    'part-time',\n    'contract',\n    'temporary',\n    'internship'\n  ];\n\n  if (blockedExactCompanies.includes(c)) return true;\n\n  if (\n    c.includes('connections') ||\n    c.includes('install linkedin widgets') ||\n    c.includes('see all jobs') ||\n    c.includes('actively recruiting') ||\n    c.includes('actively reviewing applicants') ||\n    c.includes('fast growing') ||\n    c.includes('promoted by hirer') ||\n    c.includes('responses managed off linkedin')\n  ) return true;\n\n  const roleWords = [\n    'manager', 'director', 'head', 'chief', 'vp',\n    'operations', 'revenue', 'strategy', 'business',\n    'lead', 'program', 'product', 'commercial', 'revops'\n  ];\n\n  const companyLooksLikeRole = roleWords.some(w => c.includes(w));\n  if (companyLooksLikeRole) return true;\n\n  return false;\n};\n\nconst normalizeEmailItems = $('Normalize Email Content').all();\n\nconst getEmailFields = (index) => {\n  const emailMeta = normalizeEmailItems[index]?.json || {};\n  return {\n    EmailId: emailMeta.EmailId || '',\n    ThreadId: emailMeta.ThreadId || '',\n    EmailReceived: emailMeta.EmailReceived || '',\n    EmailSubject: emailMeta.EmailSubject || '',\n    EmailSnippet: emailMeta.EmailSnippet || '',\n    TestMode: emailMeta.TestMode ?? '',\n    TestLabelUsed: emailMeta.TestLabelUsed ?? '',\n    GmailLabels: emailMeta.GmailLabels ?? '',\n  };\n};\n\nconst inferWorkType = (text) => {\n  const t = String(text || '').toLowerCase();\n  if (/\\bremote\\b/.test(t)) return 'Remote';\n  if (/\\bhybrid\\b/.test(t)) return 'Hybrid';\n  if (/\\b(on-?site|on site)\\b/.test(t)) return 'Onsite';\n  return '';\n};\n\nconst isMissingLocation = (value) => {\n  const v = String(value || '').trim();\n  return !v || v.toLowerCase() === 'not specified';\n};\n\nconst pickLocationLineFromContext = (text, role = '', company = '') => {\n  const roleNorm = String(role || '').trim().toLowerCase();\n  const companyNorm = String(company || '').trim().toLowerCase();\n  const lines = String(text || '')\n    .split('\\n')\n    .map((l) => l.trim())\n    .filter(Boolean);\n\n  const skipContextLine = (line) => {\n    if (!line) return true;\n    const lower = line.toLowerCase();\n    if (roleNorm && lower === roleNorm) return true;\n    if (companyNorm && lower === companyNorm) return true;\n    if (/^(apply|save|easy apply|full-time|part-time|promoted|similar jobs|view job|see all jobs)$/i.test(line)) return true;\n    if (/^\\d+ (connection|mutual)/i.test(line)) return true;\n    if (/^(remote|hybrid|on-?site|on site)$/i.test(line)) return true;\n    if (/connections? on linkedin/i.test(line)) return true;\n    return false;\n  };\n\n  for (const line of lines) {\n    if (skipContextLine(line)) continue;\n    if (/[·•]\\s*(remote|hybrid|on-?site|on site)\\b/i.test(line)) return line;\n    if (/,/.test(line) && line.length >= 5 && line.length <= 120 && /[a-z]/i.test(line)) return line;\n  }\n\n  for (const line of lines) {\n    if (skipContextLine(line)) continue;\n    if (line.length < 3 || line.length > 80) continue;\n    if (!/^[\\p{L}\\p{M}\\s'.-]+$/u.test(line)) continue;\n    if (/\\b(manager|director|head|chief|vp|founder|co-founder|coo|ceo|operations)\\b/i.test(line)) continue;\n    return line;\n  }\n\n  return '';\n};\n\nconst splitRoleLocationSuffix = (line, role = '') => {\n  const text = String(line || '').trim();\n  if (!text) return '';\n  const parts = text.split(/\\s*(?:—|–|\\s-\\s)\\s*/);\n  if (parts.length < 2) return '';\n  const suffix = parts[parts.length - 1].trim();\n  const roleNorm = String(role || '').trim().toLowerCase();\n  if (!suffix || suffix.toLowerCase() === roleNorm) return '';\n  if (parts[0].trim().toLowerCase() === roleNorm && suffix.length >= 3) return suffix;\n  if (suffix.length >= 3 && !/^(remote|hybrid|on-?site|on site)$/i.test(suffix)) return suffix;\n  return '';\n};\n\nconst isGenericRegionalLine = (line) =>\n  /^(remote europe|remote emea|remote worldwide|remote global)$/i.test(String(line || '').trim()) ||\n  /^(europe|emea)\\s*[·•]\\s*remote$/i.test(String(line || '').trim());\n\nconst parseLocationFromText = (text, role = '', company = '') => {\n  const lines = String(text || '')\n    .split('\\n')\n    .map((l) => l.trim())\n    .filter(Boolean);\n\n  for (const line of lines) {\n    if (/[·•]\\s*(remote|hybrid|on-?site|on site)\\b/i.test(line)) return line;\n  }\n\n  for (const line of lines) {\n    const suffix = splitRoleLocationSuffix(line, role);\n    if (suffix) return suffix;\n  }\n\n  const countries = [\n    ['bulgaria', 'Bulgaria'],\n    ['united kingdom', 'United Kingdom'],\n    ['portugal', 'Portugal'],\n    ['italy', 'Italy'],\n    ['france', 'France'],\n    ['switzerland', 'Switzerland'],\n    ['netherlands', 'Netherlands'],\n    ['germany', 'Germany'],\n    ['spain', 'Spain'],\n    ['united states', 'United States'],\n    ['slovakia', 'Slovakia'],\n    ['denmark', 'Denmark'],\n  ];\n\n  for (const line of lines) {\n    if (/^(remote|hybrid|on-?site|on site)$/i.test(line)) continue;\n    const lower = line.toLowerCase();\n    for (const [needle, label] of countries) {\n      if (lower.includes(needle)) {\n        const workType = inferWorkType(line);\n        return workType ? `${label} · ${workType}` : label;\n      }\n    }\n  }\n\n  const picked = pickLocationLineFromContext(String(text || ''), role, company);\n  if (picked && !isGenericRegionalLine(picked)) return picked;\n\n  for (const line of lines) {\n    if (isGenericRegionalLine(line)) {\n      const l = line.trim();\n      if (/emea/i.test(l)) return 'Remote EMEA';\n      if (/worldwide|global/i.test(l)) return 'Remote Worldwide';\n      return 'Remote Europe';\n    }\n  }\n\n  if (picked) return picked;\n\n  return 'Not specified';\n};\n\nconst resolveCardLocation = (rawLocation, contextText = '', role = '', company = '') => {\n  const direct = String(rawLocation || '').trim();\n  if (!isMissingLocation(direct)) return direct;\n\n  const context = String(contextText || '').trim();\n  if (!context) return 'Not specified';\n\n  return parseLocationFromText(context, role, company);\n};\n\nconst skipHintContextLine = (line, role) =>\n  !line ||\n  line === role ||\n  /^(apply|save|easy apply|full-time|part-time|promoted|similar jobs|view job|see all jobs)$/i.test(line) ||\n  /^(remote|hybrid|on-?site|on site)$/i.test(line) ||\n  /^\\d+ (connection|mutual)/i.test(line);\n\nconst recoverJobFromHint = (hint, subjectHint = {}, content = {}, hintsCount = 1) => {\n  const url = String(hint?.url || '').trim();\n  if (!url) return null;\n\n  const role = String(hint.anchorText || subjectHint.role || '').trim();\n  const contextLines = String(hint.context || '')\n    .split('\\n')\n    .map((l) => l.trim())\n    .filter(Boolean);\n\n  let company = '';\n  if (hintsCount === 1 && subjectHint.company) {\n    company = String(subjectHint.company).trim();\n  }\n  if (!company) {\n    company = contextLines.find((l) => !skipHintContextLine(l, role) && l.length <= 80) || '';\n  }\n\n  if (!company || !role) return null;\n\n  return {\n    company,\n    role,\n    location: resolveCardLocation('', hint.context, role, company),\n    work_type: inferWorkType(hint.context),\n    url: normalizeJobUrl(url) || url,\n  };\n};\n\nconst collectJobIdsFromJobList = (list) => {\n  const ids = new Set();\n  for (const j of list || []) {\n    if (!j) continue;\n    const rawUrl = String(j.url || '').trim();\n    const url = normalizeJobUrl(rawUrl) || rawUrl;\n    const id = extractJobId(url);\n    if (id) ids.add(id);\n  }\n  return ids;\n};\n\nconst backfillMissingJobsFromHints = (jobList, emailContent) => {\n  const hints = emailContent.JobUrlHints || [];\n  if (!hints.length) return jobList;\n\n  const subjectHint = emailContent.SubjectJobHint || {};\n  const extractedIds = collectJobIdsFromJobList(jobList);\n  const expectedIds = new Set();\n\n  for (const url of emailContent.LinkedInJobUrls || []) {\n    const id = extractJobId(String(url || '').trim());\n    if (id) expectedIds.add(id);\n  }\n  for (const hint of hints) {\n    const id = String(hint.jobId || extractJobId(hint.url)).trim();\n    if (id) expectedIds.add(id);\n  }\n\n  const out = [...jobList];\n  for (const hint of hints) {\n    const missingId = String(hint.jobId || extractJobId(hint.url)).trim();\n    if (!missingId || extractedIds.has(missingId)) continue;\n    if (!expectedIds.has(missingId)) continue;\n\n    const recovered = recoverJobFromHint(hint, subjectHint, emailContent, hints.length);\n    if (!recovered) continue;\n\n    extractedIds.add(missingId);\n    out.push({ ...recovered, _recoveredFromHints: true });\n  }\n\n  return out;\n};\n\nconst buildDeterministicJobs = (content) => {\n  const hints = content.JobUrlHints || [];\n  const subjectHint = content.SubjectJobHint || {};\n  const jobs = [];\n\n  for (const hint of hints) {\n    const recovered = recoverJobFromHint(hint, subjectHint, content, hints.length);\n    if (recovered) jobs.push(recovered);\n  }\n\n  if (jobs.length === 0 && hints.length === 1 && subjectHint.company && subjectHint.role) {\n    jobs.push({\n      company: String(subjectHint.company).trim(),\n      role: String(subjectHint.role).trim(),\n      location: resolveCardLocation('', content.EmailText || '', String(subjectHint.role || '').trim(), String(subjectHint.company || '').trim()),\n      work_type: inferWorkType(content.EmailText || ''),\n      url: normalizeJobUrl(String(hints[0].url || '').trim()) || String(hints[0].url || '').trim(),\n    });\n  }\n\n  return jobs;\n};\n\nconst buildFallbackItem = (emailFields, extractionError = 'AI Extract returned []') => ({\n  json: {\n    ...emailFields,\n    Source: 'LinkedIn Email',\n    Status: 'Rejected',\n    Apply: 'NO',\n    Recommendation: 'NO',\n    Apply: 'NO',\n    Reason: 'AI Extract returned no job cards',\n    RejectReason: 'AI Extract returned no job cards',\n    MainRisk: 'No job card parsed from email',\n    Risk: 'No job card parsed from email',\n    Role: '',\n    Company: '',\n    Location: '',\n    URL: '',\n    JobUrl: '',\n    JobId: '',\n    WorkType: '',\n    DedupeKey: emailFields.EmailId || '',\n    ExtractionStatus: 'NO_JOB_CARD',\n    ExtractionError: extractionError,\n    PipelineStage: 'NO_JOB_CARD',\n    LocationAllowed: true,\n    LocationRejectReason: 'AI Extract returned no job cards',\n    Notes: '',\n    ParseError: '',\n  },\n});\n\nconst output = [];\nconst seenByEmail = new Map();\nconst inputItems = $input.all();\n\nfor (let inputIndex = 0; inputIndex < inputItems.length; inputIndex++) {\n  const item = inputItems[inputIndex];\n  const emailFields = getEmailFields(inputIndex);\n  const emailId = emailFields.EmailId || `idx:${inputIndex}`;\n  if (!seenByEmail.has(emailId)) seenByEmail.set(emailId, new Set());\n  const seen = seenByEmail.get(emailId);\n  const raw = extractRawText(item);\n\n  let clean = String(raw)\n    .replace(/```json/gi, '')\n    .replace(/```/g, '')\n    .trim();\n\n  const firstBracket = clean.indexOf('[');\n  const lastBracket = clean.lastIndexOf(']');\n\n  if (firstBracket !== -1 && lastBracket !== -1 && lastBracket > firstBracket) {\n    clean = clean.slice(firstBracket, lastBracket + 1);\n  }\n\n  let parsed;\n\n  try {\n    parsed = JSON.parse(clean);\n  } catch (e) {\n    output.push(buildFallbackItem(emailFields, 'AI Extract returned invalid JSON'));\n    continue;\n  }\n\n  const jobs = Array.isArray(parsed) ? parsed : (parsed.jobs || []);\n\n  let jobList = jobs;\n  const emailContent = normalizeEmailItems[inputIndex]?.json || {};\n  if (jobList.length === 0) {\n    jobList = buildDeterministicJobs(emailContent);\n    if (jobList.length === 0) {\n      output.push(buildFallbackItem(emailFields));\n      continue;\n    }\n  } else {\n    jobList = backfillMissingJobsFromHints(jobList, emailContent);\n  }\n\n  let addedForEmail = false;\n\n  for (const j of jobList) {\n    if (!j || !j.company || !j.role) continue;\n    if (looksFakeCompany(j.company, j.role)) continue;\n\n    const company = String(j.company || '').trim();\n    const role = String(j.role || '').trim();\n    const rawUrl = String(j.url || '').trim();\n    const url = normalizeJobUrl(rawUrl) || rawUrl;\n    const jobId = extractJobId(url);\n    const hint = jobId\n      ? (emailContent.JobUrlHints || []).find(\n          (h) => String(h.jobId || extractJobId(h.url)).trim() === jobId,\n        )\n      : undefined;\n    const contextText = hint?.context || emailContent.EmailText || '';\n    const location = resolveCardLocation(j.location, contextText, role, company);\n    const workType = String(j.work_type || '').trim();\n    const dedupeKey = (jobId || `${company}|${role}|${location}`).toLowerCase();\n\n    if (!dedupeKey || dedupeKey === '||') continue;\n\n    if (seen.has(dedupeKey)) continue;\n    seen.add(dedupeKey);\n    addedForEmail = true;\n\n    const allowed = locationAllowed(location, workType);\n\n    output.push({\n      json: {\n        ...emailFields,\n        Role: role,\n        Company: company,\n        JobId: jobId,\n        Location: location,\n        WorkType: workType,\n        URL: url,\n        LocationAllowed: allowed,\n        LocationRejectReason: locationRejectReason(location, workType, allowed),\n        Source: 'LinkedIn',\n        Status: 'New',\n        Notes: j._recoveredFromHints ? 'Recovered from JobUrlHints' : '',\n        ParseError: '',\n        DedupeKey: dedupeKey\n      }\n    });\n  }\n\n  if (!addedForEmail) {\n    output.push(buildFallbackItem(emailFields, 'AI Extract returned no valid job cards'));\n  }\n}\n\nreturn output;"
+        "jsCode": "const extractRawText = (item) =>\n  item.json.output?.[0]?.content?.[0]?.text ||\n  item.json.output?.[0]?.text ||\n  item.json.content?.[0]?.text ||\n  item.json.text ||\n  item.json.response ||\n  item.json.message ||\n  '';\n\nconst extractJobId = (url) =>\n  String(url || '').match(/jobs\\/view\\/(\\d+)/)?.[1] || '';\n\nconst locationAllowed = (location, workType = '') => {\n  const loc = String(location || '').toLowerCase().trim();\n  const wt = String(workType || '').toLowerCase().trim();\n\n  if (/relocation|relocate\\s*required/.test(loc)) return false;\n\n  if (loc.includes('bulgaria')) return true;\n\n  if (\n    loc.includes('remote europe') ||\n    loc.includes('remote emea') ||\n    loc.includes('emea · remote') ||\n    loc.includes('europe · remote') ||\n    loc.includes('remote worldwide') ||\n    loc.includes('remote global')\n  ) {\n    return true;\n  }\n\n  const hasRemote = wt === 'remote' || /\\bremote\\b/.test(loc);\n  const hasHybrid = wt === 'hybrid' || /\\bhybrid\\b/.test(loc);\n  const hasOnsite =\n    wt === 'onsite' || wt === 'on-site' || /\\bon-?site\\b/.test(loc) || /\\bonsite\\b/.test(loc);\n\n  // Country-specific remote — pass early gate; verify after full job read\n  if (hasRemote && loc.includes('· remote')) return true;\n\n  // Unqualified remote — pass early gate\n  if (hasRemote && !hasHybrid && !hasOnsite) return true;\n\n  if (hasHybrid && !loc.includes('bulgaria')) return false;\n\n  if (hasOnsite && !loc.includes('bulgaria')) return false;\n\n  if (!hasRemote && !loc.includes('bulgaria')) {\n    const nonRemoteCountries = [\n      'united kingdom', 'netherlands', 'spain', 'france', 'italy',\n      'germany', 'portugal', 'switzerland', 'united states',\n    ];\n    if (nonRemoteCountries.some((c) => loc.includes(c))) return false;\n  }\n\n  return true;\n};\n\nconst locationRejectReason = (location, workType, allowed) => {\n  if (allowed) return '';\n  const loc = String(location || '').toLowerCase().trim();\n  const wt = String(workType || '').toLowerCase().trim();\n  if (/relocation|relocate\\s*required/.test(loc)) return 'Relocation required.';\n  if ((/\\bhybrid\\b/.test(loc) || wt === 'hybrid') && !loc.includes('bulgaria')) {\n    return 'Hybrid outside Bulgaria rejected.';\n  }\n  if ((/\\bon-?site\\b/.test(loc) || /\\bonsite\\b/.test(loc) || wt === 'onsite') && !loc.includes('bulgaria')) {\n    return 'On-site outside Bulgaria rejected.';\n  }\n  return 'Non-remote location outside Bulgaria rejected.';\n};\n\nconst looksFakeCompany = (company, role) => {\n  const c = String(company || '').toLowerCase().trim();\n  const r = String(role || '').toLowerCase().trim();\n\n  if (!c) return true;\n  if (c === r) return true;\n\n  const blockedExactCompanies = [\n    'remote',\n    'hybrid',\n    'onsite',\n    'on-site',\n    'on site',\n    'full-time',\n    'part-time',\n    'contract',\n    'temporary',\n    'internship'\n  ];\n\n  if (blockedExactCompanies.includes(c)) return true;\n\n  if (\n    c.includes('connections') ||\n    c.includes('install linkedin widgets') ||\n    c.includes('see all jobs') ||\n    c.includes('actively recruiting') ||\n    c.includes('actively reviewing applicants') ||\n    c.includes('fast growing') ||\n    c.includes('promoted by hirer') ||\n    c.includes('responses managed off linkedin')\n  ) return true;\n\n  const roleWords = [\n    'manager', 'director', 'head', 'chief', 'vp',\n    'operations', 'revenue', 'strategy', 'business',\n    'lead', 'program', 'product', 'commercial', 'revops'\n  ];\n\n  const companyLooksLikeRole = roleWords.some(w => c.includes(w));\n  if (companyLooksLikeRole) return true;\n\n  return false;\n};\n\nconst normalizeEmailItems = $('Normalize Email Content').all();\n\nconst getEmailFields = (index) => {\n  const emailMeta = normalizeEmailItems[index]?.json || {};\n  return {\n    EmailId: emailMeta.EmailId || '',\n    ThreadId: emailMeta.ThreadId || '',\n    EmailReceived: emailMeta.EmailReceived || '',\n    EmailSubject: emailMeta.EmailSubject || '',\n    EmailSnippet: emailMeta.EmailSnippet || '',\n    TestMode: emailMeta.TestMode ?? '',\n    TestLabelUsed: emailMeta.TestLabelUsed ?? '',\n    GmailLabels: emailMeta.GmailLabels ?? '',\n  };\n};\n\nconst inferWorkType = (text) => {\n  const t = String(text || '').toLowerCase();\n  if (/\\bremote\\b/.test(t)) return 'Remote';\n  if (/\\bhybrid\\b/.test(t)) return 'Hybrid';\n  if (/\\b(on-?site|on site)\\b/.test(t)) return 'Onsite';\n  return '';\n};\n\nconst isMissingLocation = (value) => {\n  const v = String(value || '').trim();\n  return !v || v.toLowerCase() === 'not specified';\n};\n\nconst pickLocationLineFromContext = (text, role = '', company = '') => {\n  const roleNorm = String(role || '').trim().toLowerCase();\n  const companyNorm = String(company || '').trim().toLowerCase();\n  const lines = String(text || '')\n    .split('\\n')\n    .map((l) => l.trim())\n    .filter(Boolean);\n\n  const skipContextLine = (line) => {\n    if (!line) return true;\n    const lower = line.toLowerCase();\n    if (roleNorm && lower === roleNorm) return true;\n    if (companyNorm && lower === companyNorm) return true;\n    if (/^(apply|save|easy apply|full-time|part-time|promoted|similar jobs|view job|see all jobs)$/i.test(line)) return true;\n    if (/^\\d+ (connection|mutual)/i.test(line)) return true;\n    if (/^(remote|hybrid|on-?site|on site)$/i.test(line)) return true;\n    if (/connections? on linkedin/i.test(line)) return true;\n    return false;\n  };\n\n  for (const line of lines) {\n    if (skipContextLine(line)) continue;\n    if (/[·•]\\s*(remote|hybrid|on-?site|on site)\\b/i.test(line)) return line;\n    if (/,/.test(line) && line.length >= 5 && line.length <= 120 && /[a-z]/i.test(line)) return line;\n  }\n\n  for (const line of lines) {\n    if (skipContextLine(line)) continue;\n    if (line.length < 3 || line.length > 80) continue;\n    if (!/^[\\p{L}\\p{M}\\s'.-]+$/u.test(line)) continue;\n    if (/\\b(manager|director|head|chief|vp|founder|co-founder|coo|ceo|operations)\\b/i.test(line)) continue;\n    return line;\n  }\n\n  return '';\n};\n\nconst parseLocationFromText = (text, role = '', company = '') => {\n  const t = String(text || '');\n  const lower = t.toLowerCase();\n  const workType = inferWorkType(t);\n\n  if (/remote europe/.test(lower)) return 'Remote Europe';\n  if (/remote emea/.test(lower)) return 'Remote EMEA';\n  if (/remote worldwide|remote global/.test(lower)) return 'Remote Worldwide';\n\n  const countries = [\n    ['bulgaria', 'Bulgaria'],\n    ['united kingdom', 'United Kingdom'],\n    ['portugal', 'Portugal'],\n    ['italy', 'Italy'],\n    ['france', 'France'],\n    ['switzerland', 'Switzerland'],\n    ['netherlands', 'Netherlands'],\n    ['germany', 'Germany'],\n    ['spain', 'Spain'],\n    ['united states', 'United States'],\n  ];\n\n  for (const [needle, label] of countries) {\n    if (lower.includes(needle)) {\n      return workType ? `${label} · ${workType}` : label;\n    }\n  }\n\n  const picked = pickLocationLineFromContext(t, role, company);\n  if (picked) return picked;\n\n  return 'Not specified';\n};\n\nconst resolveCardLocation = (rawLocation, contextText = '', role = '', company = '') => {\n  const direct = String(rawLocation || '').trim();\n  if (!isMissingLocation(direct)) return direct;\n\n  const context = String(contextText || '').trim();\n  if (!context) return 'Not specified';\n\n  return parseLocationFromText(context, role, company);\n};\n\nconst buildDeterministicJobs = (content) => {\n  const hints = content.JobUrlHints || [];\n  const subjectHint = content.SubjectJobHint || {};\n  const jobs = [];\n\n  const skipLine = (line, role) =>\n    !line ||\n    line === role ||\n    /^(apply|save|easy apply|full-time|part-time|promoted|similar jobs|view job|see all jobs)$/i.test(line) ||\n    /^(remote|hybrid|on-?site|on site)$/i.test(line) ||\n    /^\\d+ (connection|mutual)/i.test(line);\n\n  for (const hint of hints) {\n    const url = String(hint.url || '').trim();\n    if (!url) continue;\n\n    const role = String(hint.anchorText || subjectHint.role || '').trim();\n    const contextLines = String(hint.context || '')\n      .split('\\n')\n      .map((l) => l.trim())\n      .filter(Boolean);\n\n    let company = '';\n    if (hints.length === 1 && subjectHint.company) {\n      company = String(subjectHint.company).trim();\n    }\n    if (!company) {\n      company = contextLines.find((l) => !skipLine(l, role) && l.length <= 80) || '';\n    }\n\n    if (!company || !role) continue;\n\n    jobs.push({\n      company,\n      role,\n      location: resolveCardLocation('', hint.context, role, company),\n      work_type: inferWorkType(hint.context),\n      url,\n    });\n  }\n\n  if (jobs.length === 0 && hints.length === 1 && subjectHint.company && subjectHint.role) {\n    jobs.push({\n      company: String(subjectHint.company).trim(),\n      role: String(subjectHint.role).trim(),\n      location: resolveCardLocation('', content.EmailText || '', String(subjectHint.role || '').trim(), String(subjectHint.company || '').trim()),\n      work_type: inferWorkType(content.EmailText || ''),\n      url: String(hints[0].url || '').trim(),\n    });\n  }\n\n  return jobs;\n};\n\nconst buildFallbackItem = (emailFields, extractionError = 'AI Extract returned []') => ({\n  json: {\n    ...emailFields,\n    Source: 'LinkedIn Email',\n    Status: 'Rejected',\n    Apply: 'NO',\n    Recommendation: 'NO',\n    Apply: 'NO',\n    Reason: 'AI Extract returned no job cards',\n    RejectReason: 'AI Extract returned no job cards',\n    MainRisk: 'No job card parsed from email',\n    Risk: 'No job card parsed from email',\n    Role: '',\n    Company: '',\n    Location: '',\n    URL: '',\n    JobUrl: '',\n    JobId: '',\n    WorkType: '',\n    DedupeKey: emailFields.EmailId || '',\n    ExtractionStatus: 'NO_JOB_CARD',\n    ExtractionError: extractionError,\n    PipelineStage: 'NO_JOB_CARD',\n    LocationAllowed: true,\n    LocationRejectReason: 'AI Extract returned no job cards',\n    Notes: '',\n    ParseError: '',\n  },\n});\n\nconst output = [];\nconst seen = new Set();\nconst inputItems = $input.all();\n\nfor (let inputIndex = 0; inputIndex < inputItems.length; inputIndex++) {\n  const item = inputItems[inputIndex];\n  const emailFields = getEmailFields(inputIndex);\n  const raw = extractRawText(item);\n\n  let clean = String(raw)\n    .replace(/```json/gi, '')\n    .replace(/```/g, '')\n    .trim();\n\n  const firstBracket = clean.indexOf('[');\n  const lastBracket = clean.lastIndexOf(']');\n\n  if (firstBracket !== -1 && lastBracket !== -1 && lastBracket > firstBracket) {\n    clean = clean.slice(firstBracket, lastBracket + 1);\n  }\n\n  let parsed;\n\n  try {\n    parsed = JSON.parse(clean);\n  } catch (e) {\n    output.push(buildFallbackItem(emailFields, 'AI Extract returned invalid JSON'));\n    continue;\n  }\n\n  const jobs = Array.isArray(parsed) ? parsed : (parsed.jobs || []);\n\n  let jobList = jobs;\n  if (jobList.length === 0) {\n    const content = normalizeEmailItems[inputIndex]?.json || {};\n    jobList = buildDeterministicJobs(content);\n    if (jobList.length === 0) {\n      output.push(buildFallbackItem(emailFields));\n      continue;\n    }\n  }\n\n  let addedForEmail = false;\n\n  for (const j of jobList) {\n    if (!j || !j.company || !j.role) continue;\n    if (looksFakeCompany(j.company, j.role)) continue;\n\n    const company = String(j.company || '').trim();\n    const role = String(j.role || '').trim();\n    const url = String(j.url || '').trim();\n    const emailContent = normalizeEmailItems[inputIndex]?.json || {};\n    const hint = (emailContent.JobUrlHints || []).find(\n      (h) => String(h.url || '').trim() === url,\n    );\n    const contextText = hint?.context || emailContent.EmailText || '';\n    const location = resolveCardLocation(j.location, contextText, role, company);\n    const workType = String(j.work_type || '').trim();\n    const jobId = extractJobId(url);\n    const dedupeKey = (jobId || `${company}|${role}|${location}`).toLowerCase();\n\n    if (!dedupeKey || dedupeKey === '||') continue;\n\n    if (seen.has(dedupeKey)) continue;\n    seen.add(dedupeKey);\n    addedForEmail = true;\n\n    const allowed = locationAllowed(location, workType);\n\n    output.push({\n      json: {\n        ...emailFields,\n        Role: role,\n        Company: company,\n        JobId: jobId,\n        Location: location,\n        WorkType: workType,\n        URL: url,\n        LocationAllowed: allowed,\n        LocationRejectReason: locationRejectReason(location, workType, allowed),\n        Source: 'LinkedIn',\n        Status: 'New',\n        Notes: '',\n        ParseError: '',\n        DedupeKey: dedupeKey\n      }\n    });\n  }\n\n  if (!addedForEmail) {\n    output.push(buildFallbackItem(emailFields, 'AI Extract returned no valid job cards'));\n  }\n}\n\nreturn output;"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1152,
-        640
+        1472,
+        192
       ],
-      "id": "d6d22ceb-015c-4895-b51b-6351a5cfe27c",
+      "id": "70c90387-89f2-45af-b3ea-f109860abc74",
       "name": "Parse Job Cards"
     },
     {
       "parameters": {
-        "mode": "runOnceForAllItems",
         "jsCode": "// DEV-ONLY: cap extracted job cards per workflow run when TestMode=true.\n// TestMaxResults limits Gmail messages; MaxJobCards limits cards after Parse Job Cards.\n// Preserve pairedItem on every output item so $('Parse Job Cards').item works downstream.\nconst asBool = (v) => v === true || v === 'true' || v === 1;\nconst devConfig = $('DEV Config - Gmail Input Selection').first().json || {};\n\nif (!asBool(devConfig.TestMode)) {\n  return $input.all();\n}\n\nconst maxJobCards = Number(devConfig.MaxJobCards);\nif (!Number.isFinite(maxJobCards) || maxJobCards < 1) {\n  return $input.all();\n}\n\nconst cap = Math.max(1, Math.floor(maxJobCards));\nconst staticData = $getWorkflowStaticData('global');\nconst runKey = String($execution.id || 'dev');\n\nif (staticData.devJobCardCapRunKey !== runKey) {\n  staticData.devJobCardCapRunKey = runKey;\n  staticData.devJobCardCapCount = 0;\n}\n\nif (staticData.devJobCardCapCount >= cap) {\n  return [];\n}\n\nconst passed = [];\nfor (const item of $input.all()) {\n  if (staticData.devJobCardCapCount >= cap) break;\n  staticData.devJobCardCapCount += 1;\n  passed.push({\n    ...item,\n    json: {\n      ...item.json,\n      DevJobCardCapApplied: true,\n      DevJobCardCapLimit: cap,\n      DevJobCardCapIndex: staticData.devJobCardCapCount,\n    },\n  });\n}\n\nreturn passed;"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1264,
-        640
+        1696,
+        192
       ],
-      "id": "dev-cap-max-jobcards-emea-001",
+      "id": "3e818442-7b2f-4d6c-9655-5898d1530e97",
       "name": "DEV - Cap Max Job Cards",
       "notesInFlow": true,
       "notes": "DEV ONLY — applies MaxJobCards from DEV Config when TestMode=true.\nPass-through when TestMode=false (production).\nSet MaxJobCards in DEV Config (default 1). Scale: 1 → 10 → 50."
@@ -37,10 +36,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1208,
-        640
+        1920,
+        192
       ],
-      "id": "e6f7a8b9-c0d1-2345-ef01-devtestinj01",
+      "id": "ba8fab0e-1a67-4a9b-b457-f96dc71a7e35",
       "name": "DEV - Inject Low Preview Test Job"
     },
     {
@@ -51,10 +50,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1264,
-        640
+        2592,
+        288
       ],
-      "id": "f3a8c2e1-9b4d-4f7a-8e6c-1d2policy01",
+      "id": "11da9b12-297b-4b5a-9312-46035ce998a3",
       "name": "Policy Engine"
     },
     {
@@ -81,10 +80,10 @@
       "type": "@n8n/n8n-nodes-langchain.openAi",
       "typeVersion": 2.3,
       "position": [
-        1376,
-        640
+        2816,
+        288
       ],
-      "id": "a2b3c4d5-e6f7-8901-abcd-previewai01",
+      "id": "30ff2a84-b0d9-4e34-ae96-580a63de3e05",
       "name": "AI - Preview Score Job",
       "credentials": {
         "openAiApi": {
@@ -101,10 +100,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1496,
-        640
+        3168,
+        288
       ],
-      "id": "b3c4d5e6-f7a8-9012-bcde-previewjob01",
+      "id": "7a777c6d-7c1c-46a9-b232-507fc9f7eebd",
       "name": "Preview Score Job"
     },
     {
@@ -136,10 +135,10 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
       "position": [
-        1616,
-        640
+        3392,
+        288
       ],
-      "id": "c4d5e6f7-a8b9-0123-cdef-previewif01",
+      "id": "42b37ad6-3273-4ed6-8d8a-322dcc08dca5",
       "name": "Check Preview Threshold"
     },
     {
@@ -150,10 +149,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1616,
-        816
+        6112,
+        624
       ],
-      "id": "d5e6f7a8-b9c0-1234-def0-previewrej01",
+      "id": "275aa138-b672-488a-b9cb-062505efe7b2",
       "name": "Build Preview Reject Record"
     },
     {
@@ -174,10 +173,10 @@
       "type": "n8n-nodes-base.gmailTrigger",
       "typeVersion": 1.4,
       "position": [
-        -96,
-        640
+        -896,
+        192
       ],
-      "id": "6bd14b7d-bc39-4342-8c13-432a1af5aaef",
+      "id": "719972ea-aa57-4203-bc38-202be2a85d15",
       "name": "Gmail - Job Alerts Trigger",
       "credentials": {
         "gmailOAuth2": {
@@ -199,7 +198,7 @@
             {
               "id": "dev-gmail-test-email-id",
               "name": "TestEmailId",
-              "value": "",
+              "value": "19f2992fca6a623c",
               "type": "string"
             },
             {
@@ -241,7 +240,7 @@
             {
               "id": "dev-gmail-test-result",
               "name": "TestResult",
-              "value": 1,
+              "value": 10,
               "type": "number"
             },
             {
@@ -259,7 +258,7 @@
             {
               "id": "dev-gmail-max-job-cards",
               "name": "MaxJobCards",
-              "value": 1,
+              "value": 10,
               "type": "number"
             },
             {
@@ -281,10 +280,10 @@
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
       "position": [
-        16,
-        640
+        -672,
+        192
       ],
-      "id": "f1e2d3c4-b5a6-7890-gmail-devcfg01",
+      "id": "9db8d455-ea1d-4042-bf47-41a4f41dd248",
       "name": "DEV Config - Gmail Input Selection",
       "notesInFlow": true,
       "notes": "DEV ONLY — Gmail input selection\n\nDefault regression configuration (editable at runtime):\n  TestMode = true\n  TestLabel = jobs-exec-crm-regression\n  FetchMode = search\n  TestMaxResults = 10 (Gmail messages fetched)\n  MaxJobCards = 1 (job cards processed after Parse Job Cards)\n  Limit / TestResult = documentation fields (not wired to fetch)\n  TestEmailId = empty\n  TestSubjectContains = empty\n\nRegression scale (independent limits):\n  TestMaxResults: 1 → 10 → 50 (emails)\n  MaxJobCards: 1 → 10 → 50 (extracted job cards)\n\nPriority when TestMode=true:\n1. TestEmailId → exact message (limit 1)\n2. TestLabel → Gmail search by label (ignores TestReceivedAfter/Before)\n3. Else → date/subject search + Jobs/LinkedIn label\n\nExpected Gmail query: label:jobs-exec-crm-regression\n\nProduction override: TestMode=false (label Jobs/LinkedIn, limit 1; MaxJobCards ignored)\n\nLinkedIn HTTP throttling (Phase 2 enrichment):\n  HttpDelayMs = 2000–5000 (default 3000)\n  MaxConcurrentHttpRequests = 1"
@@ -296,10 +295,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        128,
-        640
+        -448,
+        192
       ],
-      "id": "a2b3c4d5-e6f7-8901-gmail-fetchplan01",
+      "id": "376c50a3-cf91-4539-8a80-8878f5e0a970",
       "name": "Build Gmail Fetch Plan"
     },
     {
@@ -385,10 +384,10 @@
       "type": "n8n-nodes-base.switch",
       "typeVersion": 3.2,
       "position": [
-        240,
-        640
+        -224,
+        176
       ],
-      "id": "b3c4d5e6-f7a8-9012-gmail-switch01",
+      "id": "8ddc002c-6341-4c63-b3e3-4b7b096c0ce3",
       "name": "Switch Gmail Fetch Mode"
     },
     {
@@ -404,10 +403,10 @@
       "type": "n8n-nodes-base.gmail",
       "typeVersion": 2.2,
       "position": [
-        352,
-        528
+        0,
+        0
       ],
-      "id": "a81be781-6ddd-4094-800a-fa04e2d21329",
+      "id": "00eb1007-1114-45eb-a2a9-414ddd195ead",
       "name": "Gmail - Read Job Alert Emails",
       "webhookId": "2bb4c29f-3eb2-482f-8b45-f89c8a89d70e",
       "credentials": {
@@ -427,11 +426,12 @@
       "type": "n8n-nodes-base.gmail",
       "typeVersion": 2.2,
       "position": [
-        352,
-        640
+        0,
+        192
       ],
-      "id": "c4d5e6f7-a8b9-0123-gmail-getid01",
+      "id": "9e80af24-25f0-4fae-85ca-be2d5bc24b9f",
       "name": "Gmail - Get Email By ID (DEV)",
+      "webhookId": "ce3dddf8-b68f-4b75-9125-d320370884eb",
       "credentials": {
         "gmailOAuth2": {
           "id": "8M7JlGbZTmC6zUYU",
@@ -453,11 +453,12 @@
       "type": "n8n-nodes-base.gmail",
       "typeVersion": 2.2,
       "position": [
-        352,
-        752
+        0,
+        384
       ],
-      "id": "d5e6f7a8-b9c0-1234-gmail-search01",
+      "id": "ea18b273-eddd-47d7-b451-34b197aebfd7",
       "name": "Gmail - Search Emails (DEV)",
+      "webhookId": "b5a7332e-6169-4fef-9a7c-ae1866d80aa7",
       "credentials": {
         "gmailOAuth2": {
           "id": "8M7JlGbZTmC6zUYU",
@@ -473,10 +474,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        464,
-        640
+        224,
+        192
       ],
-      "id": "b4e8f1a2-3c5d-4e6f-9a0b-emailmeta01",
+      "id": "4cfdc8b4-e37a-42f7-977c-d65aac43b031",
       "name": "Normalize Email Metadata"
     },
     {
@@ -489,10 +490,10 @@
       "type": "n8n-nodes-base.gmail",
       "typeVersion": 2.2,
       "position": [
-        576,
-        640
+        448,
+        192
       ],
-      "id": "c140781f-b974-414e-b08e-3d62f0961323",
+      "id": "da2ee54e-17f6-4c10-81ef-9c12673b0ad3",
       "name": "Extract Email Body",
       "webhookId": "043f83cd-7074-4d5b-9c32-fb631556bd0d",
       "credentials": {
@@ -505,15 +506,15 @@
     {
       "parameters": {
         "mode": "runOnceForEachItem",
-        "jsCode": "const decodeHtml = (s) =>\n  (s || '')\n    .replace(/&nbsp;/g, ' ')\n    .replace(/&amp;/g, '&')\n    .replace(/&quot;/g, '\"')\n    .replace(/&#39;/g, \"'\");\n\nconst getHeader = (json, name) => {\n  const headers = json.payload?.headers || json.headers || [];\n  if (Array.isArray(headers)) {\n    const hit = headers.find(\n      (h) => String(h.name || h.key || '').toLowerCase() === name.toLowerCase(),\n    );\n    return hit?.value || hit?.headerValue || '';\n  }\n  if (headers && typeof headers === 'object') {\n    return headers[name] || headers[name.toLowerCase()] || '';\n  }\n  return '';\n};\n\nconst stripHtmlPreview = (html, maxLen = 300) => {\n  const text = String(html || '')\n    .replace(/<style[\\s\\S]*?<\\/style>/gi, ' ')\n    .replace(/<script[\\s\\S]*?<\\/script>/gi, ' ')\n    .replace(/<[^>]+>/g, ' ')\n    .replace(/&nbsp;/g, ' ')\n    .replace(/\\s+/g, ' ')\n    .trim();\n  return text.slice(0, maxLen);\n};\n\nconst firstNonEmpty = (...values) => {\n  for (const value of values) {\n    if (value !== undefined && value !== null && String(value).trim() !== '') {\n      return String(value).trim();\n    }\n  }\n  return '';\n};\n\nconst resolveEmailReceived = (json) =>\n  firstNonEmpty(\n    json.internalDate,\n    json.date,\n    json.receivedDate,\n    getHeader(json, 'Date'),\n  );\n\nconst resolveEmailSnippet = (json) => {\n  const preview = firstNonEmpty(\n    json.snippet,\n    json.textPlain,\n    stripHtmlPreview(json.textHtml || json.html || json.textAsHtml),\n    stripHtmlPreview(json.text || json.body),\n  );\n  return preview.length > 300 ? preview.slice(0, 300) : preview;\n};\n\nconst normalizeJobUrl = (raw) => {\n  const decoded = decodeHtml(String(raw || '')).trim();\n  const jobId = decoded.match(/linkedin\\.com(?:\\/comm)?\\/jobs\\/view\\/(\\d+)/i)?.[1];\n  return jobId ? `https://www.linkedin.com/jobs/view/${jobId}` : '';\n};\n\nconst cleanText = (html) =>\n  decodeHtml(html)\n    .replace(/<style[\\s\\S]*?<\\/style>/gi, ' ')\n    .replace(/<script[\\s\\S]*?<\\/script>/gi, ' ')\n    .replace(/<!--[\\s\\S]*?-->/g, ' ')\n    .replace(/<br\\s*\\/?>/gi, '\\n')\n    .replace(/<\\/p>/gi, '\\n')\n    .replace(/<\\/div>/gi, '\\n')\n    .replace(/<\\/li>/gi, '\\n')\n    .replace(/<\\/tr>/gi, '\\n')\n    .replace(/<\\/td>/gi, '\\n')\n    .replace(/<\\/h[1-6]>/gi, '\\n')\n    .replace(/<[^>]+>/g, ' ')\n    .replace(/\\n+/g, '\\n')\n    .replace(/[ \\t]+/g, ' ')\n    .split('\\n')\n    .map(x => x.trim())\n    .filter(Boolean)\n    .join('\\n')\n    .trim();\n\nconst extractLinkedInJobUrls = (html) => {\n  const matches =\n    String(html || '').match(\n      /https?:\\/\\/(?:[a-z0-9-]+\\.)*linkedin\\.com(?:\\/comm)?\\/jobs\\/view\\/\\d+[^\"'<\\s]*/gi,\n    ) || [];\n  const seen = new Set();\n\n  return matches\n    .map((u) => normalizeJobUrl(u))\n    .filter((u) => {\n      const id = u.match(/jobs\\/view\\/(\\d+)/)?.[1] || '';\n      if (!id || seen.has(id)) return false;\n      seen.add(id);\n      return true;\n    });\n};\n\nconst parseSubjectJobHint = (subject) => {\n  const s = decodeHtml(String(subject || '')).trim();\n  if (!s) return { company: '', role: '' };\n\n  const tail = s.includes(':') ? s.split(':').pop().trim() : s;\n  const posted = tail.match(/^(.+?)\\s+-\\s+(.+?)\\s+posted\\s+on\\b/i);\n  if (posted) {\n    return { company: posted[1].trim(), role: posted[2].trim() };\n  }\n\n  const dashed = tail.match(/^([^-]+?)\\s+-\\s+(.+)$/);\n  if (dashed) {\n    const company = dashed[1].trim();\n    const role = dashed[2].trim();\n    if (company && role && !/\\bor\\b/i.test(role) && role.length < 120) {\n      return { company, role };\n    }\n  }\n\n  return { company: '', role: '' };\n};\n\nconst extractAnchorJobHints = (html) => {\n  const raw = String(html || '');\n  const hints = [];\n  const seen = new Set();\n  const re = /<a[^>]+href=[\"']([^\"']*)[\"'][^>]*>([\\s\\S]*?)<\\/a>/gi;\n  const anchors = [];\n  let match;\n\n  while ((match = re.exec(raw)) !== null) {\n    const url = normalizeJobUrl(match[1]);\n    if (!url) continue;\n\n    const jobId = url.match(/jobs\\/view\\/(\\d+)/)?.[1] || '';\n    if (!jobId || seen.has(jobId)) continue;\n    seen.add(jobId);\n\n    anchors.push({\n      url,\n      jobId,\n      anchorText: cleanText(match[2]),\n      index: match.index,\n      endIndex: match.index + match[0].length,\n    });\n  }\n\n  for (let i = 0; i < anchors.length; i++) {\n    const anchor = anchors[i];\n    const prevEnd = i > 0 ? anchors[i - 1].endIndex : Math.max(0, anchor.index - 200);\n    const nextStart =\n      i < anchors.length - 1 ? anchors[i + 1].index : Math.min(raw.length, anchor.endIndex + 1200);\n    const segment = raw.slice(prevEnd, nextStart);\n\n    hints.push({\n      url: anchor.url,\n      jobId: anchor.jobId,\n      anchorText: anchor.anchorText,\n      context: cleanText(segment).slice(0, 800),\n    });\n  }\n\n  return hints;\n};\n\nconst formatJobHintsForAI = (hints, subjectHint) => {\n  const lines = [];\n  if (subjectHint.company || subjectHint.role) {\n    lines.push(`Subject hint: company=\"${subjectHint.company}\" role=\"${subjectHint.role}\"`);\n  }\n  hints.forEach((h, i) => {\n    lines.push(`Job block ${i + 1}:`);\n    lines.push(`  URL: ${h.url}`);\n    if (h.anchorText) lines.push(`  Link text: ${h.anchorText}`);\n    if (h.context) lines.push(`  Nearby text: ${h.context}`);\n  });\n  return lines.join('\\n');\n};\n\nconst subject = $json.subject || $json.Subject || '';\nconst html = $json.html || $json.textAsHtml || $json.text || $json.textPlain || '';\n\nconst cleanedSubject = cleanText(subject);\nconst emailText = cleanText(html);\nconst urls = extractLinkedInJobUrls(html);\nconst subjectHint = parseSubjectJobHint(subject);\nconst jobUrlHints = extractAnchorJobHints(html);\nconst subjectJobHintText = subjectHint.company || subjectHint.role\n  ? `company=\"${subjectHint.company}\" role=\"${subjectHint.role}\"`\n  : '';\nconst jobUrlHintsText = formatJobHintsForAI(jobUrlHints, subjectHint);\nconst emailTextForAI = [\n  `Subject: ${cleanedSubject}`,\n  '',\n  emailText,\n  subjectJobHintText ? `\\nSubject job hint:\\n${subjectJobHintText}` : '',\n  jobUrlHintsText ? `\\nStructured job URL blocks:\\n${jobUrlHintsText}` : '',\n].join('\\n');\nconst metaFromRead = $('Normalize Email Metadata').first().json || {};\n\nreturn {\n  json: {\n    EmailId: $json.EmailId || $json.id || metaFromRead.EmailId || '',\n    ThreadId: $json.ThreadId || $json.threadId || metaFromRead.ThreadId || '',\n    EmailReceived: firstNonEmpty(\n      $json.EmailReceived,\n      resolveEmailReceived($json),\n      metaFromRead.EmailReceived,\n      resolveEmailReceived(metaFromRead),\n    ),\n    EmailSubject: firstNonEmpty(\n      $json.EmailSubject,\n      $json.Subject,\n      $json.subject,\n      metaFromRead.EmailSubject,\n    ),\n    EmailSnippet: firstNonEmpty(\n      $json.EmailSnippet,\n      resolveEmailSnippet($json),\n      metaFromRead.EmailSnippet,\n      resolveEmailSnippet(metaFromRead),\n    ),\n    Subject: cleanedSubject,\n    EmailText: emailText,\n    EmailTextForAI: emailTextForAI,\n    SubjectJobHint: subjectHint,\n    SubjectJobHintText: subjectJobHintText,\n    JobUrlHints: jobUrlHints,\n    JobUrlHintsText: jobUrlHintsText,\n    LinkedInJobUrls: urls,\n    LinkedInJobUrlsText: urls.join('\\n'),\n    Source: 'LinkedIn',\n    TestMode: metaFromRead.TestMode ?? '',\n    TestLabelUsed: metaFromRead.TestLabelUsed ?? '',\n    GmailLabels: metaFromRead.GmailLabels ?? '',\n  }\n};"
+        "jsCode": "const decodeHtml = (s) =>\n  (s || '')\n    .replace(/&nbsp;/g, ' ')\n    .replace(/&amp;/g, '&')\n    .replace(/&quot;/g, '\"')\n    .replace(/&#39;/g, \"'\");\n\nconst getHeader = (json, name) => {\n  const headers = json.payload?.headers || json.headers || [];\n  if (Array.isArray(headers)) {\n    const hit = headers.find(\n      (h) => String(h.name || h.key || '').toLowerCase() === name.toLowerCase(),\n    );\n    return hit?.value || hit?.headerValue || '';\n  }\n  if (headers && typeof headers === 'object') {\n    return headers[name] || headers[name.toLowerCase()] || '';\n  }\n  return '';\n};\n\nconst stripHtmlPreview = (html, maxLen = 300) => {\n  const text = String(html || '')\n    .replace(/<style[\\s\\S]*?<\\/style>/gi, ' ')\n    .replace(/<script[\\s\\S]*?<\\/script>/gi, ' ')\n    .replace(/<[^>]+>/g, ' ')\n    .replace(/&nbsp;/g, ' ')\n    .replace(/\\s+/g, ' ')\n    .trim();\n  return text.slice(0, maxLen);\n};\n\nconst firstNonEmpty = (...values) => {\n  for (const value of values) {\n    if (value !== undefined && value !== null && String(value).trim() !== '') {\n      return String(value).trim();\n    }\n  }\n  return '';\n};\n\nconst resolveEmailReceived = (json) =>\n  firstNonEmpty(\n    json.internalDate,\n    json.date,\n    json.receivedDate,\n    getHeader(json, 'Date'),\n  );\n\nconst resolveEmailSnippet = (json) => {\n  const preview = firstNonEmpty(\n    json.snippet,\n    json.textPlain,\n    stripHtmlPreview(json.textHtml || json.html || json.textAsHtml),\n    stripHtmlPreview(json.text || json.body),\n  );\n  return preview.length > 300 ? preview.slice(0, 300) : preview;\n};\n\nconst normalizeJobUrl = (raw) => {\n  const decoded = decodeHtml(String(raw || '')).trim();\n  const jobId = decoded.match(/linkedin\\.com(?:\\/comm)?\\/jobs\\/view\\/(\\d+)/i)?.[1];\n  return jobId ? `https://www.linkedin.com/jobs/view/${jobId}` : '';\n};\n\nconst cleanText = (html) =>\n  decodeHtml(html)\n    .replace(/<style[\\s\\S]*?<\\/style>/gi, ' ')\n    .replace(/<script[\\s\\S]*?<\\/script>/gi, ' ')\n    .replace(/<!--[\\s\\S]*?-->/g, ' ')\n    .replace(/<br\\s*\\/?>/gi, '\\n')\n    .replace(/<\\/p>/gi, '\\n')\n    .replace(/<\\/div>/gi, '\\n')\n    .replace(/<\\/li>/gi, '\\n')\n    .replace(/<\\/tr>/gi, '\\n')\n    .replace(/<\\/td>/gi, '\\n')\n    .replace(/<\\/h[1-6]>/gi, '\\n')\n    .replace(/<[^>]+>/g, ' ')\n    .replace(/\\n+/g, '\\n')\n    .replace(/[ \\t]+/g, ' ')\n    .split('\\n')\n    .map(x => x.trim())\n    .filter(Boolean)\n    .join('\\n')\n    .trim();\n\nconst extractLinkedInJobUrls = (html) => {\n  const matches =\n    String(html || '').match(\n      /https?:\\/\\/(?:[a-z0-9-]+\\.)*linkedin\\.com(?:\\/comm)?\\/jobs\\/view\\/\\d+[^\"'<\\s]*/gi,\n    ) || [];\n  const seen = new Set();\n\n  return matches\n    .map((u) => normalizeJobUrl(u))\n    .filter((u) => {\n      const id = u.match(/jobs\\/view\\/(\\d+)/)?.[1] || '';\n      if (!id || seen.has(id)) return false;\n      seen.add(id);\n      return true;\n    });\n};\n\nconst parseSubjectJobHint = (subject) => {\n  const s = decodeHtml(String(subject || '')).trim();\n  if (!s) return { company: '', role: '' };\n\n  const tail = s.includes(':') ? s.split(':').pop().trim() : s;\n  const posted = tail.match(/^(.+?)\\s+-\\s+(.+?)\\s+posted\\s+on\\b/i);\n  if (posted) {\n    return { company: posted[1].trim(), role: posted[2].trim() };\n  }\n\n  const dashed = tail.match(/^([^-]+?)\\s+-\\s+(.+)$/);\n  if (dashed) {\n    const company = dashed[1].trim();\n    const role = dashed[2].trim();\n    if (company && role && !/\\bor\\b/i.test(role) && role.length < 120) {\n      return { company, role };\n    }\n  }\n\n  return { company: '', role: '' };\n};\n\nconst extractAnchorJobHints = (html) => {\n  const hints = [];\n  const seen = new Set();\n  const re = /<a[^>]+href=[\"']([^\"']*)[\"'][^>]*>([\\s\\S]*?)<\\/a>/gi;\n  let match;\n\n  while ((match = re.exec(String(html || ''))) !== null) {\n    const url = normalizeJobUrl(match[1]);\n    if (!url) continue;\n\n    const jobId = url.match(/jobs\\/view\\/(\\d+)/)?.[1] || '';\n    if (!jobId || seen.has(jobId)) continue;\n    seen.add(jobId);\n\n    hints.push({\n      url,\n      jobId,\n      anchorText: cleanText(match[2]),\n      context: cleanText(String(html || '').slice(match.index, match.index + 1200)).slice(0, 500),\n    });\n  }\n\n  return hints;\n};\n\nconst formatJobHintsForAI = (hints, subjectHint) => {\n  const lines = [];\n  if (subjectHint.company || subjectHint.role) {\n    lines.push(`Subject hint: company=\"${subjectHint.company}\" role=\"${subjectHint.role}\"`);\n  }\n  hints.forEach((h, i) => {\n    lines.push(`Job block ${i + 1}:`);\n    lines.push(`  URL: ${h.url}`);\n    if (h.anchorText) lines.push(`  Link text: ${h.anchorText}`);\n    if (h.context) lines.push(`  Nearby text: ${h.context}`);\n  });\n  return lines.join('\\n');\n};\n\nconst subject = $json.subject || $json.Subject || '';\nconst html = $json.html || $json.textAsHtml || $json.text || $json.textPlain || '';\n\nconst cleanedSubject = cleanText(subject);\nconst emailText = cleanText(html);\nconst urls = extractLinkedInJobUrls(html);\nconst subjectHint = parseSubjectJobHint(subject);\nconst jobUrlHints = extractAnchorJobHints(html);\nconst subjectJobHintText = subjectHint.company || subjectHint.role\n  ? `company=\"${subjectHint.company}\" role=\"${subjectHint.role}\"`\n  : '';\nconst jobUrlHintsText = formatJobHintsForAI(jobUrlHints, subjectHint);\nconst emailTextForAI = [\n  `Subject: ${cleanedSubject}`,\n  '',\n  emailText,\n  subjectJobHintText ? `\\nSubject job hint:\\n${subjectJobHintText}` : '',\n  jobUrlHintsText ? `\\nStructured job URL blocks:\\n${jobUrlHintsText}` : '',\n].join('\\n');\nconst metaFromRead = $('Normalize Email Metadata').first().json || {};\n\nreturn {\n  json: {\n    EmailId: $json.EmailId || $json.id || metaFromRead.EmailId || '',\n    ThreadId: $json.ThreadId || $json.threadId || metaFromRead.ThreadId || '',\n    EmailReceived: firstNonEmpty(\n      $json.EmailReceived,\n      resolveEmailReceived($json),\n      metaFromRead.EmailReceived,\n      resolveEmailReceived(metaFromRead),\n    ),\n    EmailSubject: firstNonEmpty(\n      $json.EmailSubject,\n      $json.Subject,\n      $json.subject,\n      metaFromRead.EmailSubject,\n    ),\n    EmailSnippet: firstNonEmpty(\n      $json.EmailSnippet,\n      resolveEmailSnippet($json),\n      metaFromRead.EmailSnippet,\n      resolveEmailSnippet(metaFromRead),\n    ),\n    Subject: cleanedSubject,\n    EmailText: emailText,\n    EmailTextForAI: emailTextForAI,\n    SubjectJobHint: subjectHint,\n    SubjectJobHintText: subjectJobHintText,\n    JobUrlHints: jobUrlHints,\n    JobUrlHintsText: jobUrlHintsText,\n    LinkedInJobUrls: urls,\n    LinkedInJobUrlsText: urls.join('\\n'),\n    Source: 'LinkedIn',\n    TestMode: metaFromRead.TestMode ?? '',\n    TestLabelUsed: metaFromRead.TestLabelUsed ?? '',\n    GmailLabels: metaFromRead.GmailLabels ?? '',\n  }\n};"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        576,
-        640
+        672,
+        192
       ],
-      "id": "162a50a3-26d8-49c5-a740-f1bae2ffdea6",
+      "id": "a3844404-04a6-4aac-bde8-1f7b6322dba4",
       "name": "Normalize Email Content"
     },
     {
@@ -537,10 +538,10 @@
       "type": "@n8n/n8n-nodes-langchain.openAi",
       "typeVersion": 2.3,
       "position": [
-        800,
-        640
+        1120,
+        192
       ],
-      "id": "d7f02e28-7014-434a-a5f7-9f60ed4c3939",
+      "id": "4a5e4417-c899-49b6-8b4b-72195e5f29bb",
       "name": "AI - Extract Job Cards",
       "credentials": {
         "openAiApi": {
@@ -577,10 +578,10 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
       "position": [
-        1376,
-        640
+        3616,
+        224
       ],
-      "id": "ab74a66a-5f98-4730-b41d-f1451310eb22",
+      "id": "0603077c-d61e-48d9-8eb6-1a7d658d1ccc",
       "name": "Check Location Eligibility"
     },
     {
@@ -606,10 +607,10 @@
       "type": "@n8n/n8n-nodes-langchain.openAi",
       "typeVersion": 2.3,
       "position": [
-        1824,
-        496
+        4064,
+        96
       ],
-      "id": "7305a273-0e80-4dc1-887b-ce8a02d49163",
+      "id": "62165592-471d-4199-8b70-bfa5ce5aa16e",
       "name": "AI - Initial Job Evaluation",
       "credentials": {
         "openAiApi": {
@@ -626,10 +627,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        2176,
-        496
+        4416,
+        96
       ],
-      "id": "3ed84cf8-9267-484e-a245-310c6ae26880",
+      "id": "ff29b0fc-fb4a-4b72-801e-d9d18bf21ef9",
       "name": "Normalize AI Evaluation"
     },
     {
@@ -656,10 +657,10 @@
       "type": "@n8n/n8n-nodes-langchain.openAi",
       "typeVersion": 2.3,
       "position": [
-        2624,
-        448
+        5312,
+        0
       ],
-      "id": "98dc2c35-cdf5-4aa0-a881-43cba7a4ef31",
+      "id": "d9dce587-d9f7-4bc8-af26-72eeee0b68ec",
       "name": "AI - Verified Review",
       "credentials": {
         "openAiApi": {
@@ -676,10 +677,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        2688,
-        688
+        4128,
+        464
       ],
-      "id": "01f32a15-831f-436e-9bf8-12e5ac624922",
+      "id": "2644fc10-c2a4-44a6-95c2-3abe469b718e",
       "name": "Build Reject Record"
     },
     {
@@ -687,10 +688,10 @@
       "type": "n8n-nodes-base.merge",
       "typeVersion": 3.2,
       "position": [
-        3200,
-        576
+        6336,
+        288
       ],
-      "id": "bf54e5ac-fe49-42c6-911e-e3c2105af800",
+      "id": "fb501d21-639c-4bcb-ac9b-c5bf6f886a40",
       "name": "Merge Final Records"
     },
     {
@@ -1337,10 +1338,10 @@
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.7,
       "position": [
-        3424,
-        576
+        7008,
+        288
       ],
-      "id": "832cadaf-8b7b-4626-a510-16c4c9ef3745",
+      "id": "5607e24d-6c31-4eea-ba20-95e5602b392b",
       "name": "Append to Google Sheets",
       "retryOnFail": true,
       "waitBetweenTries": 3000,
@@ -1358,10 +1359,10 @@
       "type": "n8n-nodes-base.wait",
       "typeVersion": 1.1,
       "position": [
-        3648,
-        576
+        7232,
+        288
       ],
-      "id": "f8e49b35-9958-4526-af1b-0c1943a68218",
+      "id": "ad65cd2c-1bb1-4bc4-b364-718969b57b64",
       "name": "Execution Delay",
       "webhookId": "754e3b1e-cd96-405c-aeca-4ebd2ca9e774"
     },
@@ -1403,10 +1404,10 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
       "position": [
-        1600,
-        576
+        3840,
+        144
       ],
-      "id": "849311e3-32ae-425a-b29b-3612c0c08e8b",
+      "id": "50324a36-bf3d-49ab-9d56-2a9977ebd112",
       "name": "Validate Parsed Jobs"
     },
     {
@@ -1417,10 +1418,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        2976,
-        448
+        5664,
+        0
       ],
-      "id": "6cdadb09-d78c-4e11-aa21-5c0b95183d51",
+      "id": "dafd558f-67c6-4648-8eb1-8750b937ed63",
       "name": "Normalize Verified Review"
     },
     {
@@ -1451,10 +1452,10 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
       "position": [
-        3088,
-        448
+        5888,
+        0
       ],
-      "id": "emea-check-verified-score-threshold-3c",
+      "id": "42559809-a847-4432-91f6-ff50e05b1ef9",
       "name": "Check Verified Score Threshold"
     },
     {
@@ -1465,38 +1466,36 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        3088,
-        640
+        6112,
+        80
       ],
-      "id": "emea-build-verified-score-reject-3c",
+      "id": "c6c46a21-70a7-495a-8b03-4464604f09b2",
       "name": "Build Verified Score Reject Record"
     },
     {
       "parameters": {
-        "mode": "runOnceForAllItems",
         "jsCode": "// Pre-extraction filter: skip LinkedIn digest / non-job-alert emails (no AI cost, no sheet row).\nconst DIGEST_SUBJECT_PATTERNS = [\n  /^\\s*jobs\\s+similar\\s+to\\s+your\\s+alert\\b/i,\n  /\\bjobs\\s+similar\\s+to\\s+your\\s+(?:job\\s+)?alert\\b/i,\n  /\\bsimilar\\s+jobs\\s+(?:you\\s+may\\s+be\\s+interested|based\\s+on)\\b/i,\n  /\\bpeople\\s+also\\s+viewed\\b/i,\n  /\\brecommended\\s+jobs\\s+for\\s+you\\b/i,\n];\nconst isDigestSubject = (subject) => {\n  const s = String(subject || '').trim();\n  if (!s) return false;\n  return DIGEST_SUBJECT_PATTERNS.some((re) => re.test(s));\n};\nconst kept = [];\nfor (const item of $input.all()) {\n  const subject = item.json.EmailSubject || item.json.Subject || '';\n  if (isDigestSubject(subject)) continue;\n  kept.push({ json: { ...item.json, DigestEmailSkipped: false } });\n}\nreturn kept;"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        688,
-        640
+        896,
+        192
       ],
-      "id": "filter-digest-emails-emea-001",
+      "id": "9f9b6c77-d6fa-49d9-90e4-412248c0aeab",
       "name": "Filter Skip Digest Emails"
     },
     {
       "parameters": {
-        "mode": "runOnceForAllItems",
         "jsCode": "// CRM append gate - only write rows with Company + Role, unless explicit debug mode.\nconst CRM_APPEND_DEBUG = false;\nconst asBool = (v) => v === true || v === 'true' || v === 1;\nconst hasText = (v) => String(v ?? '').trim() !== '';\nconst isDebugAppend = (j) =>\n  CRM_APPEND_DEBUG === true\n  || asBool(j.CrmAppendDebug)\n  || (asBool(j.TestMode) && hasText(j.TestLabelUsed));\nconst items = $input.all();\nconst passed = [];\nfor (const item of items) {\n  const j = item.json;\n  const company = String(j.Company ?? '').trim();\n  const role = String(j.Role ?? '').trim();\n  if ((company && role) || isDebugAppend(j)) passed.push(item);\n}\nreturn passed;"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        3312,
-        576
+        6784,
+        288
       ],
-      "id": "gate-append-crm-emea-001",
+      "id": "eadb59a6-abd4-498c-8efd-1db6dc47ac7a",
       "name": "Gate Append to CRM Sheet"
     },
     {
@@ -1506,10 +1505,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        3312,
-        448
+        6560,
+        288
       ],
-      "id": "regression-assert-emea-001",
+      "id": "0901ecd5-9722-4e31-b70a-4f05f2bd4917",
       "name": "Regression Assert - Score Path"
     },
     {
@@ -1519,10 +1518,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1040,
-        768
+        2144,
+        192
       ],
-      "id": "dev-score-path-regression-emea-001",
+      "id": "9b5a33b1-ce57-481a-9e44-9ad336adee1e",
       "name": "DEV - Inject Score Path Regression Case"
     },
     {
@@ -1554,10 +1553,10 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
       "position": [
-        1184,
-        640
+        2368,
+        192
       ],
-      "id": "check-job-cards-emea-001",
+      "id": "7ee7b9ce-e26c-497a-b619-98b1c46fef34",
       "name": "Check Job Cards Extracted"
     },
     {
@@ -1568,22 +1567,20 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1184,
-        480
+        2592,
+        96
       ],
-      "id": "build-no-job-card-emea-001",
+      "id": "d5a937e9-72f5-4ace-90a1-d10e0e1f3c83",
       "name": "Build No Job Card Record"
     },
     {
       "parameters": {
-        "looseTypeValidation": true,
-        "options": {},
         "conditions": {
           "options": {
-            "version": 3,
-            "typeValidation": "loose",
+            "caseSensitive": true,
             "leftValue": "",
-            "caseSensitive": true
+            "typeValidation": "loose",
+            "version": 3
           },
           "conditions": [
             {
@@ -1598,20 +1595,21 @@
             }
           ],
           "combinator": "and"
-        }
+        },
+        "looseTypeValidation": true,
+        "options": {}
       },
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
       "position": [
-        2320,
-        496
+        4640,
+        96
       ],
-      "id": "emea-url-if-001",
+      "id": "981b564a-5654-4a45-92a9-89a60452b80e",
       "name": "Check Job URL Valid"
     },
     {
       "parameters": {
-        "method": "GET",
         "url": "={{ $json.JobId ? 'https://www.linkedin.com/jobs-guest/jobs/api/jobPosting/' + String($json.JobId).trim() : $json.URL }}",
         "sendHeaders": true,
         "headerParameters": {
@@ -1633,17 +1631,16 @@
             "response": {
               "responseFormat": "text"
             }
-          },
-          "includeInputFields": true
+          }
         }
       },
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.4,
       "position": [
-        2480,
-        400
+        4864,
+        0
       ],
-      "id": "emea-http-request-001",
+      "id": "739079a8-67e3-4a80-8722-7995c319cad1",
       "name": "HTTP Request",
       "notesInFlow": true,
       "notes": "LinkedIn guest API fetch. Sequential throttling via batching (batchSize=1, batchInterval from DEV Config HttpDelayMs 2000-5000 ms)."
@@ -1656,10 +1653,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        2600,
-        400
+        5088,
+        0
       ],
-      "id": "emea-extract-linkedin-001",
+      "id": "98f186c2-5ff3-4c42-b8b6-879edb700306",
       "name": "Extract LinkedIn Job Description"
     },
     {
@@ -1670,10 +1667,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        2480,
-        640
+        6112,
+        272
       ],
-      "id": "emea-no-url-preview-001",
+      "id": "2dc48003-fe20-4789-a16b-a58d17c4d22a",
       "name": "Build No URL Preview Only Record"
     }
   ],
@@ -1788,9 +1785,6 @@
           }
         ]
       ]
-    },
-    "Build No Job Card Record": {
-      "main": []
     },
     "Policy Engine": {
       "main": [
@@ -2146,11 +2140,6 @@
         ]
       ]
     },
-    "Execution Delay": {
-      "main": [
-        []
-      ]
-    },
     "Validate Parsed Jobs": {
       "main": [
         [
@@ -2224,15 +2213,13 @@
   "active": false,
   "settings": {
     "executionOrder": "v1",
-    "binaryMode": "separate",
-    "availableInMCP": false
+    "binaryMode": "separate"
   },
-  "versionId": "9e549d46-d33a-4778-9c39-1673b5fd1274",
+  "versionId": "2d2b4148-a89a-4235-9d54-3c789777bd73",
   "meta": {
-    "templateCredsSetupCompleted": true,
     "instanceId": "b9354026cec4ec7c920288107d54e259bdbb33dcd0d36ad90ab94b019850fec2"
   },
   "nodeGroups": [],
-  "id": "xFkA0pDWBHaBqnzi",
+  "id": "fu2nupaJ9tp8UuG8",
   "tags": []
 }
