@@ -11,7 +11,7 @@
         1472,
         192
       ],
-      "id": "70c90387-89f2-45af-b3ea-f109860abc74",
+      "id": "32aa7a45-4a9b-4f57-a197-0253fd03bdf9",
       "name": "Parse Job Cards"
     },
     {
@@ -24,7 +24,7 @@
         1696,
         192
       ],
-      "id": "3e818442-7b2f-4d6c-9655-5898d1530e97",
+      "id": "75c85474-7a77-4627-87c4-deb88b6ec80f",
       "name": "DEV - Cap Max Job Cards",
       "notesInFlow": true,
       "notes": "DEV ONLY — applies MaxJobCards from DEV Config when TestMode=true.\nPass-through when TestMode=false (production).\nSet MaxJobCards in DEV Config (default 1). Scale: 1 → 10 → 50."
@@ -39,7 +39,7 @@
         1920,
         192
       ],
-      "id": "ba8fab0e-1a67-4a9b-b457-f96dc71a7e35",
+      "id": "dea27109-397e-456c-85d8-31f74c8ccad4",
       "name": "DEV - Inject Low Preview Test Job"
     },
     {
@@ -53,7 +53,7 @@
         2592,
         288
       ],
-      "id": "11da9b12-297b-4b5a-9312-46035ce998a3",
+      "id": "2fd6841a-a5c0-497a-9c36-90f028556676",
       "name": "Policy Engine"
     },
     {
@@ -83,7 +83,7 @@
         2816,
         288
       ],
-      "id": "30ff2a84-b0d9-4e34-ae96-580a63de3e05",
+      "id": "6f304764-6bd6-491c-b3ab-4df94fcd7c24",
       "name": "AI - Preview Score Job",
       "credentials": {
         "openAiApi": {
@@ -103,7 +103,7 @@
         3168,
         288
       ],
-      "id": "7a777c6d-7c1c-46a9-b232-507fc9f7eebd",
+      "id": "dca7604a-dea9-4497-9bfb-667d6c7ff70d",
       "name": "Preview Score Job"
     },
     {
@@ -138,7 +138,7 @@
         3392,
         288
       ],
-      "id": "42b37ad6-3273-4ed6-8d8a-322dcc08dca5",
+      "id": "93bf0716-78c6-4fb1-a15d-84f0794a4759",
       "name": "Check Preview Threshold"
     },
     {
@@ -152,7 +152,7 @@
         6112,
         624
       ],
-      "id": "275aa138-b672-488a-b9cb-062505efe7b2",
+      "id": "f3d75391-ddb0-4965-812c-fbf9a30c76a4",
       "name": "Build Preview Reject Record"
     },
     {
@@ -176,7 +176,7 @@
         -896,
         192
       ],
-      "id": "719972ea-aa57-4203-bc38-202be2a85d15",
+      "id": "fd6e5057-162f-4b64-a243-cfffbc4ca0a8",
       "name": "Gmail - Job Alerts Trigger",
       "credentials": {
         "gmailOAuth2": {
@@ -283,7 +283,7 @@
         -672,
         192
       ],
-      "id": "9db8d455-ea1d-4042-bf47-41a4f41dd248",
+      "id": "541be9b7-7024-47ea-8dc3-d94b46dbb5d9",
       "name": "DEV Config - Gmail Input Selection",
       "notesInFlow": true,
       "notes": "DEV ONLY — Gmail input selection\n\nDefault regression configuration (editable at runtime):\n  TestMode = true\n  TestLabel = jobs-exec-crm-regression\n  FetchMode = search\n  TestMaxResults = 10 (Gmail messages fetched)\n  MaxJobCards = 1 (job cards processed after Parse Job Cards)\n  Limit / TestResult = documentation fields (not wired to fetch)\n  TestEmailId = empty\n  TestSubjectContains = empty\n\nRegression scale (independent limits):\n  TestMaxResults: 1 → 10 → 50 (emails)\n  MaxJobCards: 1 → 10 → 50 (extracted job cards)\n\nPriority when TestMode=true:\n1. TestEmailId → exact message (limit 1)\n2. TestLabel → Gmail search by label (ignores TestReceivedAfter/Before)\n3. Else → date/subject search + Jobs/LinkedIn label\n\nExpected Gmail query: label:jobs-exec-crm-regression\n\nProduction override: TestMode=false (label Jobs/LinkedIn, limit 1; MaxJobCards ignored)\n\nLinkedIn HTTP throttling (Phase 2 enrichment):\n  HttpDelayMs = 2000–5000 (default 3000)\n  MaxConcurrentHttpRequests = 1"
@@ -298,7 +298,7 @@
         -448,
         192
       ],
-      "id": "376c50a3-cf91-4539-8a80-8878f5e0a970",
+      "id": "e43faafe-3f62-4b07-8bd5-aa8c85699178",
       "name": "Build Gmail Fetch Plan"
     },
     {
@@ -387,7 +387,7 @@
         -224,
         176
       ],
-      "id": "8ddc002c-6341-4c63-b3e3-4b7b096c0ce3",
+      "id": "ae564ccf-8ddf-4f07-96d9-eb2ad75be751",
       "name": "Switch Gmail Fetch Mode"
     },
     {
@@ -406,7 +406,7 @@
         0,
         0
       ],
-      "id": "00eb1007-1114-45eb-a2a9-414ddd195ead",
+      "id": "e8042c1d-bf16-4005-a413-d8c9f550ebfe",
       "name": "Gmail - Read Job Alert Emails",
       "webhookId": "2bb4c29f-3eb2-482f-8b45-f89c8a89d70e",
       "credentials": {
@@ -429,7 +429,7 @@
         0,
         192
       ],
-      "id": "9e80af24-25f0-4fae-85ca-be2d5bc24b9f",
+      "id": "ad68640e-5efd-4d09-819b-093f2dadf8a3",
       "name": "Gmail - Get Email By ID (DEV)",
       "webhookId": "ce3dddf8-b68f-4b75-9125-d320370884eb",
       "credentials": {
@@ -456,7 +456,7 @@
         0,
         384
       ],
-      "id": "ea18b273-eddd-47d7-b451-34b197aebfd7",
+      "id": "8d4f7c75-915b-45d0-9cb7-c0b6cfb0f10b",
       "name": "Gmail - Search Emails (DEV)",
       "webhookId": "b5a7332e-6169-4fef-9a7c-ae1866d80aa7",
       "credentials": {
@@ -477,7 +477,7 @@
         224,
         192
       ],
-      "id": "4cfdc8b4-e37a-42f7-977c-d65aac43b031",
+      "id": "65bc9a81-5891-4050-b751-18ea13577627",
       "name": "Normalize Email Metadata"
     },
     {
@@ -493,7 +493,7 @@
         448,
         192
       ],
-      "id": "da2ee54e-17f6-4c10-81ef-9c12673b0ad3",
+      "id": "9db07ca6-217f-43f6-b7d5-05d539a2952d",
       "name": "Extract Email Body",
       "webhookId": "043f83cd-7074-4d5b-9c32-fb631556bd0d",
       "credentials": {
@@ -514,7 +514,7 @@
         672,
         192
       ],
-      "id": "a3844404-04a6-4aac-bde8-1f7b6322dba4",
+      "id": "a573a544-cb10-4d50-a08d-e5e8b6cd1965",
       "name": "Normalize Email Content"
     },
     {
@@ -541,7 +541,7 @@
         1120,
         192
       ],
-      "id": "4a5e4417-c899-49b6-8b4b-72195e5f29bb",
+      "id": "9e47a026-6e7f-49d1-89dc-2f00847e3257",
       "name": "AI - Extract Job Cards",
       "credentials": {
         "openAiApi": {
@@ -581,7 +581,7 @@
         3616,
         224
       ],
-      "id": "0603077c-d61e-48d9-8eb6-1a7d658d1ccc",
+      "id": "35f68599-e046-4964-9a93-d94f480414b3",
       "name": "Check Location Eligibility"
     },
     {
@@ -610,7 +610,7 @@
         4064,
         96
       ],
-      "id": "62165592-471d-4199-8b70-bfa5ce5aa16e",
+      "id": "f2b59125-8f0c-4f41-b366-007b6bbb3bc7",
       "name": "AI - Initial Job Evaluation",
       "credentials": {
         "openAiApi": {
@@ -630,7 +630,7 @@
         4416,
         96
       ],
-      "id": "ff29b0fc-fb4a-4b72-801e-d9d18bf21ef9",
+      "id": "d86ad0aa-006d-4f69-9115-4f791db396d9",
       "name": "Normalize AI Evaluation"
     },
     {
@@ -660,7 +660,7 @@
         5312,
         0
       ],
-      "id": "d9dce587-d9f7-4bc8-af26-72eeee0b68ec",
+      "id": "298e6946-2b83-441b-8088-bb3b7c298a58",
       "name": "AI - Verified Review",
       "credentials": {
         "openAiApi": {
@@ -680,7 +680,7 @@
         4128,
         464
       ],
-      "id": "2644fc10-c2a4-44a6-95c2-3abe469b718e",
+      "id": "ae031baa-ceef-4415-a925-bb9fe5e294ba",
       "name": "Build Reject Record"
     },
     {
@@ -691,7 +691,7 @@
         6336,
         288
       ],
-      "id": "fb501d21-639c-4bcb-ac9b-c5bf6f886a40",
+      "id": "d9622f90-db42-4923-9b4c-b87f7da1ebf1",
       "name": "Merge Final Records"
     },
     {
@@ -1341,7 +1341,7 @@
         7008,
         288
       ],
-      "id": "5607e24d-6c31-4eea-ba20-95e5602b392b",
+      "id": "be1b11fe-2e12-487e-80bd-75660052d526",
       "name": "Append to Google Sheets",
       "retryOnFail": true,
       "waitBetweenTries": 3000,
@@ -1362,7 +1362,7 @@
         7232,
         288
       ],
-      "id": "ad65cd2c-1bb1-4bc4-b364-718969b57b64",
+      "id": "23f932c7-838f-47c5-bed2-5b0f9826c6b2",
       "name": "Execution Delay",
       "webhookId": "754e3b1e-cd96-405c-aeca-4ebd2ca9e774"
     },
@@ -1407,7 +1407,7 @@
         3840,
         144
       ],
-      "id": "50324a36-bf3d-49ab-9d56-2a9977ebd112",
+      "id": "d58f9a24-3961-4630-88f0-9c703e83230b",
       "name": "Validate Parsed Jobs"
     },
     {
@@ -1421,7 +1421,7 @@
         5664,
         0
       ],
-      "id": "dafd558f-67c6-4648-8eb1-8750b937ed63",
+      "id": "13f40616-62f9-443b-8cec-76493c27fdc2",
       "name": "Normalize Verified Review"
     },
     {
@@ -1455,7 +1455,7 @@
         5888,
         0
       ],
-      "id": "42559809-a847-4432-91f6-ff50e05b1ef9",
+      "id": "e2edcd6d-2f23-4543-92ec-0c72ff2bcc41",
       "name": "Check Verified Score Threshold"
     },
     {
@@ -1469,7 +1469,7 @@
         6112,
         80
       ],
-      "id": "c6c46a21-70a7-495a-8b03-4464604f09b2",
+      "id": "c2767f26-910d-4da2-903e-a4a2365445a4",
       "name": "Build Verified Score Reject Record"
     },
     {
@@ -1482,7 +1482,7 @@
         896,
         192
       ],
-      "id": "9f9b6c77-d6fa-49d9-90e4-412248c0aeab",
+      "id": "023c639d-faf0-4f86-bb7f-caffd0f1c830",
       "name": "Filter Skip Digest Emails"
     },
     {
@@ -1495,7 +1495,7 @@
         6784,
         288
       ],
-      "id": "eadb59a6-abd4-498c-8efd-1db6dc47ac7a",
+      "id": "76c01009-a760-423e-be9b-e6a588ecc644",
       "name": "Gate Append to CRM Sheet"
     },
     {
@@ -1508,7 +1508,7 @@
         6560,
         288
       ],
-      "id": "0901ecd5-9722-4e31-b70a-4f05f2bd4917",
+      "id": "14fb6988-ce03-490a-b8b1-3248b2e3dd6c",
       "name": "Regression Assert - Score Path"
     },
     {
@@ -1521,7 +1521,7 @@
         2144,
         192
       ],
-      "id": "9b5a33b1-ce57-481a-9e44-9ad336adee1e",
+      "id": "46d7c987-0277-47a3-9be9-dee274510c21",
       "name": "DEV - Inject Score Path Regression Case"
     },
     {
@@ -1556,7 +1556,7 @@
         2368,
         192
       ],
-      "id": "7ee7b9ce-e26c-497a-b619-98b1c46fef34",
+      "id": "b6bfba94-6eee-46ea-a6b4-574f7cfd208f",
       "name": "Check Job Cards Extracted"
     },
     {
@@ -1570,7 +1570,7 @@
         2592,
         96
       ],
-      "id": "d5a937e9-72f5-4ace-90a1-d10e0e1f3c83",
+      "id": "0b926e94-faf2-4feb-b77f-ef788db9bad6",
       "name": "Build No Job Card Record"
     },
     {
@@ -1605,7 +1605,7 @@
         4640,
         96
       ],
-      "id": "981b564a-5654-4a45-92a9-89a60452b80e",
+      "id": "82ed4bfa-4f0d-4d81-bdee-ba57415fd85f",
       "name": "Check Job URL Valid"
     },
     {
@@ -1640,7 +1640,7 @@
         4864,
         0
       ],
-      "id": "739079a8-67e3-4a80-8722-7995c319cad1",
+      "id": "a537b2d0-9f26-4422-89c1-d383fe9491e9",
       "name": "HTTP Request",
       "notesInFlow": true,
       "notes": "LinkedIn guest API fetch. Sequential throttling via batching (batchSize=1, batchInterval from DEV Config HttpDelayMs 2000-5000 ms)."
@@ -1656,7 +1656,7 @@
         5088,
         0
       ],
-      "id": "98f186c2-5ff3-4c42-b8b6-879edb700306",
+      "id": "5ebf32f6-236a-4212-80bc-d888e493cb0c",
       "name": "Extract LinkedIn Job Description"
     },
     {
@@ -1670,7 +1670,7 @@
         6112,
         272
       ],
-      "id": "2dc48003-fe20-4789-a16b-a58d17c4d22a",
+      "id": "ea8e479e-0205-47ec-8601-d46b4ec0c17d",
       "name": "Build No URL Preview Only Record"
     }
   ],
@@ -2215,11 +2215,11 @@
     "executionOrder": "v1",
     "binaryMode": "separate"
   },
-  "versionId": "2d2b4148-a89a-4235-9d54-3c789777bd73",
+  "versionId": "ecc28910-7430-46bf-b071-4632582d3aa9",
   "meta": {
     "instanceId": "b9354026cec4ec7c920288107d54e259bdbb33dcd0d36ad90ab94b019850fec2"
   },
   "nodeGroups": [],
-  "id": "fu2nupaJ9tp8UuG8",
+  "id": "F2hjydM133srfpWu",
   "tags": []
 }
