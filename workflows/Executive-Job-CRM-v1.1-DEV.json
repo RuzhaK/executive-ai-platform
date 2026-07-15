@@ -1746,7 +1746,7 @@
     {
       "parameters": {
         "mode": "runOnceForEachItem",
-        "jsCode": "const MIN_FULL_JOB_TEXT = 200;\nconst MAX_FULL_JOB_TEXT = 15000;\n\nconst decodeHtml = (s) =>\n  String(s || \"\")\n    .replace(/&nbsp;/gi, \" \")\n    .replace(/&amp;/gi, \"&\")\n    .replace(/&quot;/gi, '\"')\n    .replace(/&#39;/gi, \"'\")\n    .replace(/&lt;/gi, \"<\")\n    .replace(/&gt;/gi, \">\");\n\nconst stripTags = (html) =>\n  String(html || \"\")\n    .replace(/<script[\\s\\S]*?<\\/script>/gi, \" \")\n    .replace(/<style[\\s\\S]*?<\\/style>/gi, \" \")\n    .replace(/<!--[\\s\\S]*?-->/g, \" \")\n    .replace(/<[^>]+>/g, \" \")\n    .replace(/\\s+/g, \" \")\n    .trim();\n\nconst isJobPostingType = (value) => {\n  if (value === \"JobPosting\") return true;\n  if (Array.isArray(value)) return value.includes(\"JobPosting\");\n  return false;\n};\n\nconst extractJsonLdJobPostingDescription = (html) => {\n  const blocks =\n    String(html || \"\").match(\n      /<script[^>]*type=[\"']application\\/ld\\+json[\"'][^>]*>([\\s\\S]*?)<\\/script>/gi,\n    ) || [];\n\n  for (const block of blocks) {\n    const inner = block.replace(/^<script[^>]*>/i, \"\").replace(/<\\/script>$/i, \"\").trim();\n    try {\n      const parsed = JSON.parse(inner);\n      const nodes = Array.isArray(parsed) ? parsed : [parsed];\n      for (const node of nodes) {\n        const graph = Array.isArray(node?.[\"@graph\"]) ? node[\"@graph\"] : [];\n        const candidates = [node, ...graph];\n        for (const item of candidates) {\n          if (!isJobPostingType(item?.[\"@type\"])) continue;\n          const desc = item?.description;\n          if (desc && String(desc).trim().length > 80) {\n            return decodeHtml(stripTags(String(desc)));\n          }\n        }\n      }\n    } catch {\n      // try next block\n    }\n  }\n  return \"\";\n};\n\nconst extractShowMoreMarkup = (html) => {\n  const raw = String(html || \"\");\n  const patterns = [\n    /class=\"[^\"]*show-more-less-html__markup[^\"]*\"[^>]*>([\\s\\S]*?)<\\/div>/i,\n    /show-more-less-html__markup[^>]*>([\\s\\S]*?)<\\/div>/i,\n  ];\n  for (const pattern of patterns) {\n    const match = raw.match(pattern);\n    if (match?.[1]) {\n      const text = decodeHtml(stripTags(match[1]));\n      if (text.length >= MIN_FULL_JOB_TEXT) return text;\n    }\n  }\n  return \"\";\n};\n\nconst extractGuestDescriptionRich = (html) => {\n  const raw = String(html || \"\");\n  const patterns = [\n    /class=\"[^\"]*description__text[^\"]*description__text--rich[^\"]*\"[^>]*>([\\s\\S]*?)<\\/div>/i,\n    /description__text--rich[^>]*>([\\s\\S]*?)<\\/div>/i,\n  ];\n  for (const pattern of patterns) {\n    const match = raw.match(pattern);\n    if (match?.[1]) {\n      const text = decodeHtml(stripTags(match[1]));\n      if (text.length >= MIN_FULL_JOB_TEXT) return text;\n    }\n  }\n  return \"\";\n};\n\nconst extractLinkedInDescription = (html) => {\n  const jsonLd = extractJsonLdJobPostingDescription(html);\n  if (jsonLd.length >= MIN_FULL_JOB_TEXT) return jsonLd;\n\n  const showMore = extractShowMoreMarkup(html);\n  if (showMore.length >= MIN_FULL_JOB_TEXT) return showMore;\n\n  const guestRich = extractGuestDescriptionRich(html);\n  if (guestRich.length >= MIN_FULL_JOB_TEXT) return guestRich;\n\n  return decodeHtml(stripTags(html));\n};\n\nconst looksLikeHardBlock = (html, text) => {\n  const h = String(html || \"\").toLowerCase();\n  const t = String(text || \"\").toLowerCase();\n  if (h.includes(\"authwall\")) return true;\n  if (t.includes(\"sign in to linkedin\")) return true;\n  if (t.length < 80 && /login|authwall/.test(h)) return true;\n  return false;\n};\n\nconst upstream = $(\"Normalize AI Evaluation\").item?.json || {};\nconst jobId = String(upstream.JobId || $json.JobId || \"\").trim();\nconst statusCode = Number($json.statusCode || 0);\nconst html =\n  typeof $json.data === \"string\"\n    ? $json.data\n    : typeof $json.body === \"string\"\n      ? $json.body\n      : typeof $json === \"string\"\n        ? $json\n        : \"\";\n\nlet enrichmentError = \"\";\nlet fullJobText = \"\";\n\nif (!jobId && !String(upstream.URL || $json.URL || \"\").trim()) {\n  enrichmentError = \"Missing JobId and URL\";\n} else if (statusCode >= 400) {\n  enrichmentError = `HTTP ${statusCode}`;\n} else if (!String(html).trim()) {\n  enrichmentError = \"Empty response\";\n} else {\n  fullJobText = extractLinkedInDescription(html).slice(0, MAX_FULL_JOB_TEXT);\n  const stripped = stripTags(html);\n  if (fullJobText.trim().length < MIN_FULL_JOB_TEXT) {\n    enrichmentError = looksLikeHardBlock(html, stripped)\n      ? \"Auth wall / login page\"\n      : \"No description block found\";\n  }\n}\n\nconst enrichmentStatus =\n  fullJobText.trim().length >= MIN_FULL_JOB_TEXT && !enrichmentError ? \"OK\" : \"FAILED\";\n\nreturn {\n  json: {\n    ...upstream,\n    FullJobText: fullJobText.trim(),\n    FullJobTextLength: fullJobText.trim().length,\n    EnrichmentStatus: enrichmentStatus,\n    EnrichmentError: enrichmentStatus === \"OK\" ? \"\" : enrichmentError || \"Extraction failed\",\n  },\n};"
+        "jsCode": "const MIN_FULL_JOB_TEXT = 200;\nconst MAX_FULL_JOB_TEXT = 15000;\n\nconst decodeHtml = (s) =>\n  String(s || \"\")\n    .replace(/&nbsp;/gi, \" \")\n    .replace(/&amp;/gi, \"&\")\n    .replace(/&quot;/gi, '\"')\n    .replace(/&#39;/gi, \"'\")\n    .replace(/&lt;/gi, \"<\")\n    .replace(/&gt;/gi, \">\");\n\nconst stripTags = (html) =>\n  String(html || \"\")\n    .replace(/<script[\\s\\S]*?<\\/script>/gi, \" \")\n    .replace(/<style[\\s\\S]*?<\\/style>/gi, \" \")\n    .replace(/<!--[\\s\\S]*?-->/g, \" \")\n    .replace(/<[^>]+>/g, \" \")\n    .replace(/\\s+/g, \" \")\n    .trim();\n\nconst isJobPostingType = (value) => {\n  if (value === \"JobPosting\") return true;\n  if (Array.isArray(value)) return value.includes(\"JobPosting\");\n  return false;\n};\n\nconst extractJsonLdJobPostingDescription = (html) => {\n  const blocks =\n    String(html || \"\").match(\n      /<script[^>]*type=[\"']application\\/ld\\+json[\"'][^>]*>([\\s\\S]*?)<\\/script>/gi,\n    ) || [];\n\n  for (const block of blocks) {\n    const inner = block.replace(/^<script[^>]*>/i, \"\").replace(/<\\/script>$/i, \"\").trim();\n    try {\n      const parsed = JSON.parse(inner);\n      const nodes = Array.isArray(parsed) ? parsed : [parsed];\n      for (const node of nodes) {\n        const graph = Array.isArray(node?.[\"@graph\"]) ? node[\"@graph\"] : [];\n        const candidates = [node, ...graph];\n        for (const item of candidates) {\n          if (!isJobPostingType(item?.[\"@type\"])) continue;\n          const desc = item?.description;\n          if (desc && String(desc).trim().length > 80) {\n            return decodeHtml(stripTags(String(desc)));\n          }\n        }\n      }\n    } catch {\n      // try next block\n    }\n  }\n  return \"\";\n};\n\nconst extractShowMoreMarkup = (html) => {\n  const raw = String(html || \"\");\n  const patterns = [\n    /class=\"[^\"]*show-more-less-html__markup[^\"]*\"[^>]*>([\\s\\S]*?)<\\/div>/i,\n    /show-more-less-html__markup[^>]*>([\\s\\S]*?)<\\/div>/i,\n  ];\n  for (const pattern of patterns) {\n    const match = raw.match(pattern);\n    if (match?.[1]) {\n      const text = decodeHtml(stripTags(match[1]));\n      if (text.length >= MIN_FULL_JOB_TEXT) return text;\n    }\n  }\n  return \"\";\n};\n\nconst extractGuestDescriptionRich = (html) => {\n  const raw = String(html || \"\");\n  const patterns = [\n    /class=\"[^\"]*description__text[^\"]*description__text--rich[^\"]*\"[^>]*>([\\s\\S]*?)<\\/div>/i,\n    /description__text--rich[^>]*>([\\s\\S]*?)<\\/div>/i,\n  ];\n  for (const pattern of patterns) {\n    const match = raw.match(pattern);\n    if (match?.[1]) {\n      const text = decodeHtml(stripTags(match[1]));\n      if (text.length >= MIN_FULL_JOB_TEXT) return text;\n    }\n  }\n  return \"\";\n};\n\nconst extractLinkedInDescription = (html) => {\n  const jsonLd = extractJsonLdJobPostingDescription(html);\n  if (jsonLd.length >= MIN_FULL_JOB_TEXT) return jsonLd;\n\n  const showMore = extractShowMoreMarkup(html);\n  if (showMore.length >= MIN_FULL_JOB_TEXT) return showMore;\n\n  const guestRich = extractGuestDescriptionRich(html);\n  if (guestRich.length >= MIN_FULL_JOB_TEXT) return guestRich;\n\n  return decodeHtml(stripTags(html));\n};\n\nconst looksLikeHardBlock = (html, text) => {\n  const h = String(html || \"\").toLowerCase();\n  const t = String(text || \"\").toLowerCase();\n  if (h.includes(\"authwall\")) return true;\n  if (t.includes(\"sign in to linkedin\")) return true;\n  if (t.length < 80 && /login|authwall/.test(h)) return true;\n  return false;\n};\n\nconst CLOSED_POSTING_REJECT = \"No longer accepting applications\";\n\nconst isPostingClosedInRawGuestHtml = (html) => {\n  const raw = String(html || \"\");\n  if (!raw.trim()) return false;\n  if (/closed-job__flavor--closed/i.test(raw)) return true;\n  if (/no longer accepting applications/i.test(raw)) return true;\n  return false;\n};\n\nconst upstream = $(\"Normalize AI Evaluation\").item?.json || {};\nconst jobId = String(upstream.JobId || $json.JobId || \"\").trim();\nconst statusCode = Number($json.statusCode || 0);\nconst html =\n  typeof $json.data === \"string\"\n    ? $json.data\n    : typeof $json.body === \"string\"\n      ? $json.body\n      : typeof $json === \"string\"\n        ? $json\n        : \"\";\n\nconst postingClosedConfirmed =\n  statusCode > 0 &&\n  statusCode < 400 &&\n  String(html).trim().length > 0 &&\n  isPostingClosedInRawGuestHtml(html);\n\nlet enrichmentError = \"\";\nlet fullJobText = \"\";\n\nif (!jobId && !String(upstream.URL || $json.URL || \"\").trim()) {\n  enrichmentError = \"Missing JobId and URL\";\n} else if (statusCode >= 400) {\n  enrichmentError = `HTTP ${statusCode}`;\n} else if (!String(html).trim()) {\n  enrichmentError = \"Empty response\";\n} else {\n  fullJobText = extractLinkedInDescription(html).slice(0, MAX_FULL_JOB_TEXT);\n  const stripped = stripTags(html);\n  if (fullJobText.trim().length < MIN_FULL_JOB_TEXT) {\n    enrichmentError = looksLikeHardBlock(html, stripped)\n      ? \"Auth wall / login page\"\n      : \"No description block found\";\n  }\n}\n\nconst enrichmentStatus =\n  fullJobText.trim().length >= MIN_FULL_JOB_TEXT && !enrichmentError ? \"OK\" : \"FAILED\";\n\nreturn {\n  json: {\n    ...upstream,\n    FullJobText: fullJobText.trim(),\n    FullJobTextLength: fullJobText.trim().length,\n    EnrichmentStatus: enrichmentStatus,\n    EnrichmentError: enrichmentStatus === \"OK\" ? \"\" : enrichmentError || \"Extraction failed\",\n    PostingClosedConfirmed: postingClosedConfirmed,\n    PostingClosedRejectReason: postingClosedConfirmed ? CLOSED_POSTING_REJECT : \"\",\n  },\n};"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -1756,6 +1756,55 @@
       ],
       "id": "5ebf32f6-236a-4212-80bc-d888e493cb0c",
       "name": "Extract LinkedIn Job Description"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "emea-posting-closed-confirmed",
+              "leftValue": "={{$json.PostingClosedConfirmed}}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        5200,
+        0
+      ],
+      "id": "1365fc32-dd4b-4f76-bd45-226ccb86e8a8",
+      "name": "Check Posting Closed"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// EMEA-C6 closed-posting hard reject — before Verified AI.\nreturn {\n  json: {\n    ...$json,\n    Status: 'Closed',\n    RejectReason: $json.PostingClosedRejectReason || 'No longer accepting applications',\n    MainRisk: $json.PostingClosedRejectReason || 'No longer accepting applications',\n    FinalDecision: 'REJECT',\n    PipelineStage: 'FINAL_REJECT',\n    auto_reject_reason: 'CLOSED_POSTING',\n    VerifiedRecommendation: 'NO',\n    VerifiedScore: '',\n    VerifiedRisk: '',\n    VerifiedWhyApply: '',\n    FinalCV: '',\n    VerifiedInterviewProbability: '',\n    VerifiedPriority: '',\n    SalaryEstimate: '',\n    SalaryRange: '',\n    SalaryTarget: '',\n    SalaryConfidence: '',\n    SalaryAssumption: '',\n    LocationFit: '',\n  },\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        6112,
+        -96
+      ],
+      "id": "4c36d005-7136-4a3f-a39c-035cc82be136",
+      "name": "Build Closed Posting Reject Record"
     },
     {
       "parameters": {
@@ -2361,9 +2410,38 @@
       "main": [
         [
           {
+            "node": "Check Posting Closed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Posting Closed": {
+      "main": [
+        [
+          {
+            "node": "Build Closed Posting Reject Record",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
             "node": "Mandatory Domain Gate",
             "type": "main",
             "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Closed Posting Reject Record": {
+      "main": [
+        [
+          {
+            "node": "Merge Final Records",
+            "type": "main",
+            "index": 1
           }
         ]
       ]
