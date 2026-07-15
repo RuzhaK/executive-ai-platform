@@ -1,0 +1,240 @@
+# Project Backlog
+
+Executive Opportunity Intelligence Platform — EMEA dev pipeline (`emea-v1.1`).
+
+**Source of truth:** `workflows/Executive-Job-CRM-v1.1-DEV.json`  
+**Architecture reference:** `docs/architecture/WORKFLOW_ARCHITECTURE.md`  
+**Engineering rules:** `docs/PROJECT_RULES.md`  
+**BG portability items:** `docs/BG_PORTABILITY_BACKLOG.md`
+
+---
+
+## Status values
+
+Use these statuses on every tracked item (commit, gate, or backlog ID):
+
+| Status | Meaning |
+|--------|---------|
+| **OPEN** | Approved scope or identified work; not started |
+| **IN_PROGRESS** | Implementation or regression in flight |
+| **DONE** | Shipped and on current baseline (or historical milestone retained for reference) |
+| **SUPERSEDED** | Replaced by a later item; do not extend or re-implement |
+| **WONT_FIX** | Explicitly declined; retained for audit only |
+
+---
+
+## Current Baseline
+
+| Item | Value |
+|------|--------|
+| **Branch** | `emea-v1.1` |
+| **Commit** | `3ebeaf0326afc5a2a623cb6eb15e264ccba95b7c` — `fix(emea): C2.1 proven-within mandatory domain detection` |
+| **Workflow file** | `workflows/Executive-Job-CRM-v1.1-DEV.json` |
+| **Nodes / connections** | 46 / 54 |
+| **Regression label** | `jobs-exec-crm-regression` |
+| **DEV spreadsheet** | `Executive Job CRM - EMEA DEV` (`1x_f_DK5yi3FprfIo2w1Pf1Q9VaAeUeMm66gOnR7igJs`) |
+
+### Pre-Preview chain (C1)
+
+```
+Policy Engine → Check Language in Title
+  TRUE  → Build Language Title Reject Record → Merge Final Records (input 1)
+  FALSE → AI - Preview Score Job → …
+```
+
+### Post-Extract pre-Verified chain (C2)
+
+```
+Extract LinkedIn Job Description → Mandatory Domain Gate → Check Mandatory Domain
+  TRUE  → Build Mandatory Domain Reject Record → Merge Final Records (input 1)
+  FALSE → AI - Verified Review → Normalize Verified Review → …
+```
+
+### Frozen (do not change without explicit approval)
+
+- `AI - Verified Review` prompt (Phase 3A.x calibration)
+- `Normalize Verified Review` (Phase 3A.3 hard-eligibility preservation)
+- `Build Verified Score Reject Record` and verified-score path
+- Google Sheets schema
+- BG production workflow (`Executive_Job_CRM_BG_v1.1.2_PRODUCTION.json`)
+
+### Reference backups (EMEA)
+
+Under `Executive Opportunity Intelligence Platform/backups/EMEA BACKUPs/`:
+
+- v17 — `Executive Job CRM - EMEA DEV v17 - Pre-Verified-HardEligibility-Fix.json` (full pre-Verified gate reference; do not wholesale import)
+- Phase 3A.3 baseline — commit `b80d15b` (41 nodes / 47 connections)
+
+### Known regression failure — Fulchester (C2.1 DONE)
+
+| Field | Value |
+|-------|--------|
+| **Backlog ID** | `EMEA-C2.1` |
+| **Status** | **DONE** |
+| **Commit** | `3ebeaf0326afc5a2a623cb6eb15e264ccba95b7c` |
+| **Company** | Fulchester Consultants |
+| **Role** | Managing Director |
+| **JobId** | `4434499750` |
+| **EmailId** | `19f2992fca6a623c` |
+| **Pre-fix result** | `MandatoryDomainBlocked = false`, `MandatoryDomainRejectReason = ""`, `MandatoryDomainLabel = ""` |
+| **Expected (post-fix)** | `FINAL_REJECT` before `AI - Verified Review` |
+| **Trigger sentence** | *Proven senior leadership experience within home care, healthcare, or a related multi-site/service-led environment.* |
+| **Root cause (pre-fix)** | `hasMandatoryLanguage()` did not recognize **“Proven … experience within …”** phrasing. Domain patterns (`home care`, `healthcare`) are present and would match if mandatory language fired. |
+| **Fix shipped** | Added to `hasMandatoryLanguage` return: `/\bproven\s+(?:senior\s+)?(?:leadership\s+)?experience\s+within\b/i` |
+
+---
+
+## Completed Work
+
+### Infrastructure & DEV harness (`emea-v1.1`, pre-restoration)
+
+| Status | Commit | Summary |
+|--------|--------|---------|
+| DONE | `eb49f8f` | Phase 0 — Preview pipeline / field contract baseline |
+| DONE | `c2a23fd` | Phase 1.1 — skip LinkedIn digest emails before extraction AI |
+| DONE | `31ed041` | Phase 1.3 — gate CRM append on non-empty Company and Role |
+| DONE | `947656a` | Infrastructure parity — TestLabel, HttpDelayMs, Gmail fetch plan, Sheets test metadata |
+| DONE | `f822fc7` | DEV default regression configuration (`jobs-exec-crm-regression`, Limit 10) |
+| DONE | `cc574a3` | MaxJobCards cap after Parse Job Cards |
+| DONE | `40ab802` | Phase 1.2 — isolate NO_JOB_CARD before Preview AI |
+| DONE | `3c45a61` | Phase 2 — full posting enrichment plumbing |
+| DONE | `8bbe820` | EMEA schema — enrichment ops fields to DEV Google Sheet |
+
+### Verified AI calibration (Phase 3A)
+
+| Status | Commit | Summary |
+|--------|--------|---------|
+| DONE | `1129a40` / `57a7642` | Verified prompt uses FullJobText (EMEA) |
+| DONE | `4931861` | Phase 3A.1 — evidence-only prompt cleanup (no speculation) |
+| DONE | `9c76947` | Phase 3A.2 — Stage 1 hard eligibility gate in Verified prompt |
+| DONE | `b80d15b` | Phase 3A.3 — Normalize preserves Stage 1 hard rejects (no location sanitization override) |
+
+### Location / parse fixes (Phase 3C family)
+
+| Status | Commits | Summary |
+|--------|---------|---------|
+| DONE | `d21bfe4` … `55181e7` | Card location preservation, parse isolation, backfill (historical; pre-restoration base) |
+
+---
+
+## Gate & restoration tracker
+
+Pre-Verified gate work from v17 reference. One commit per gate unless noted.
+
+| Status | ID / commit | Item | Placement / notes |
+|--------|-------------|------|-------------------|
+| DONE | `7514dc2` | **C1 — Language-in-title** | Pre-Preview (`Policy Engine` → IF → reject \| Preview) |
+| SUPERSEDED | `9acb019` | C2 — Mandatory domain in Policy Engine (pre-Preview) | Replaced by `8773158` |
+| DONE | `8773158` | **C2 — Mandatory specialized domain (structural move)** | Post-Extract, pre-Verified (`Mandatory Domain Gate` on `FullJobText`) |
+| DONE | `3ebeaf0326afc5a2a623cb6eb15e264ccba95b7c` | **C2.1 — `hasMandatoryLanguage` proven-within regex** | `Mandatory Domain Gate` only; Fulchester `4434499750` |
+| OPEN | **EMEA-C2-TEST** | C2 regression Limit 1 → 10 → 50 | After C2.1 |
+| OPEN | **EMEA-C3** | Mandatory language (FullJobText) | Post-Extract chain |
+| OPEN | **EMEA-C4** | Country-list remote / explicit residency | Post-Extract chain |
+| OPEN | **EMEA-C5** | Founder / co-founder role | Post-Extract chain; immediate predecessor to Verified |
+| OPEN | **EMEA-C6** | Closed posting (guest HTML markers) | First gate after Extract; requires minimal Extract patch |
+
+**Target enrichment topology (after C3–C6):**
+
+```
+Extract → Closed → Country-list → Domain → Language → Founder → AI - Verified Review
+```
+
+---
+
+## Open Work
+
+### P0 — C2 mandatory-domain (next approved change)
+
+| Status | ID | Item | Notes |
+|--------|-----|------|-------|
+| DONE | **EMEA-C2.1** | Add `/\bproven\s+(?:senior\s+)?(?:leadership\s+)?experience\s+within\b/i` to `hasMandatoryLanguage` | Commit `3ebeaf0326afc5a2a623cb6eb15e264ccba95b7c`; Fulchester `4434499750` |
+| OPEN | **EMEA-C2-TEST** | Limit 1 → 10 → 50 after C2.1 | Mill `4436662085`, Fulchester `4434499750` / `19f2992fca6a623c`, soft preference, transferable sectors |
+
+### P1 — Deterministic hard-eligibility (not yet gated)
+
+| Status | ID | Item | Notes |
+|--------|-----|------|-------|
+| OPEN | **EMEA-TRAVEL** | Mandatory travel **>20%** hard reject | Fulchester `FullJobText`: *“Travel across the region as required (approx. 20–30%)”*. Separate commit from C2.1 |
+| OPEN | **EMEA-TZ** | Mandatory incompatible timezone | Verified Stage 1 prompt only; no pre-Verified gate |
+
+### P2 — Verified / calibration (prompt-only, when approved)
+
+| Status | ID | Item | Source |
+|--------|-----|------|--------|
+| OPEN | **EMEA-VER-P1** | Risk must drive `apply` / `final_decision` — no `APPLY NOW` with material blocker in `Verified Risk` | v13 calibration review |
+| OPEN | **EMEA-VER-P2** | Location / residency uncertainty → cap at `MONITOR`, not `APPLY NOW` | v13 review |
+| OPEN | **EMEA-VER-P3** | Propagate Stage 1 blocker text into `RejectReason` on score-0 hard rejects | v13 review |
+
+### P2 — BG portability (after EMEA validation)
+
+| Status | ID | Item | Notes |
+|--------|-----|------|-------|
+| OPEN | **PBG-001** | Preview open-for-verification calibration | See `docs/BG_PORTABILITY_BACKLOG.md` |
+| OPEN | **PBG-002** | Closed-posting gate | See `docs/BG_PORTABILITY_BACKLOG.md` |
+
+### P3 — Documentation / hygiene
+
+| Status | ID | Item |
+|--------|-----|------|
+| OPEN | **DOC-ARCH** | Reconcile `docs/architecture/WORKFLOW_ARCHITECTURE.md` with post-C2 topology (46 nodes) |
+| OPEN | **DOC-SHEET** | Fix `Company = System.Xml.XmlElement` append mapping noted in v13 export |
+
+---
+
+## Regression Rules
+
+### Test protocol (all functional changes)
+
+1. Import `Executive-Job-CRM-v1.1-DEV.json` into n8n dev.
+2. Run from **`DEV Config - Gmail Input Selection`** (not Gmail trigger) when trigger trial blocks.
+3. Scale: **Limit = 1 → 10 → 50** (and `MaxJobCards` independently when testing card volume).
+4. Stop and fix before advancing scale if any case fails.
+
+### Mandatory-domain gate (C2 — `8773158` DONE; C2.1 — `3ebeaf0326afc5a2a623cb6eb15e264ccba95b7c` DONE)
+
+| Case | Input / condition | Expected |
+|------|-------------------|----------|
+| **A. Mill Adventure** | JobId `4436662085`; `FullJobText` contains *“5+ years in leading iGaming brands in regulated markets is mandatory”* | `FINAL_REJECT` before `AI - Verified Review`; `Status: Hard Eligibility Reject`; Preview fields preserved |
+| **B. Fulchester — mandatory** | Fulchester Consultants / Managing Director / JobId `4434499750`; `FullJobText` contains *“Proven senior leadership experience within home care, healthcare…”* | `FINAL_REJECT` before Verified (**DONE at `3ebeaf0326afc5a2a623cb6eb15e264ccba95b7c`**) |
+| **B. Fulchester — preferred only** | Wording is preference only, not mandatory | Pass to Verified |
+| **C. Soft preference** | *“Healthcare experience preferred”* | Pass (soft-preference guard) |
+| **D. Transferable sectors** | SaaS / FinTech / manufacturing / retail / logistics / BPO — no explicit mandatory niche-domain wording | Pass |
+| **E. C1 integrity** | `Director (German)` → language reject before Preview; `Head of Sales - Spain` → pass to Preview | Unchanged |
+| **F. Enrichment fail-open** | `EnrichmentStatus != OK` or `FullJobTextLength < 200` | `MandatoryDomainBlocked = false`; may continue to Verified |
+
+**Fulchester is not a universal negative control.** If `FullJobText` explicitly requires prior senior leadership in home care / healthcare, it must REJECT (same class as Mill Adventure iGaming).
+
+### Language-in-title gate (C1 — `7514dc2` DONE)
+
+| Case | Expected |
+|------|----------|
+| `Role: "Director (German)"` | `POLICY_REJECT` / Language Rejected before Preview |
+| `Role: "Head of Sales - Spain"` | Pass to Preview (country name, not language mandate) |
+| `Role: "Founder's Office Director"` | Pass (not a language-in-title block) |
+
+### Enrichment / gate fail-open (global)
+
+When `EnrichmentStatus` is not `OK` or `FullJobTextLength < 200`, deterministic post-Extract gates must **fail open** (do not hard-reject on missing posting text). Verified AI may still evaluate thin context.
+
+### Protected paths (must not regress)
+
+| Path | Rule |
+|------|------|
+| NO_JOB_CARD | `Check Job Cards Extracted` FALSE → `Build No Job Card Record`; no Preview/Verified |
+| NO_URL_PREVIEW_ONLY | Missing/invalid URL → preview-only; no HTTP; gates skipped |
+| Verified score reject | `Check Verified Score Threshold` FALSE → `Build Verified Score Reject Record` → Merge (unchanged) |
+| Normalize 3A.3 | Stage 1 hard rejects from Verified AI must not be overwritten by location sanitization |
+
+### Rollback references
+
+| Status | Target | Command |
+|--------|--------|---------|
+| DONE | C2.1 only (`3ebeaf0326afc5a2a623cb6eb15e264ccba95b7c`) | `git revert 3ebeaf0326afc5a2a623cb6eb15e264ccba95b7c` |
+| DONE | C2 structural (`8773158`) | `git checkout 8773158 -- workflows/Executive-Job-CRM-v1.1-DEV.json` |
+| SUPERSEDED | Misplaced C2 (`9acb019`) | `git checkout 9acb019 -- workflows/Executive-Job-CRM-v1.1-DEV.json` |
+| DONE | C1 only (no C2) | `git checkout 7514dc2 -- workflows/Executive-Job-CRM-v1.1-DEV.json` |
+| DONE | Phase 3A.3 baseline | `git checkout b80d15b -- workflows/Executive-Job-CRM-v1.1-DEV.json` |
+
+---
+
+*Last updated: 2026-07-15 — baseline `3ebeaf0326afc5a2a623cb6eb15e264ccba95b7c` (DONE). `EMEA-C2.1` DONE at `3ebeaf0326afc5a2a623cb6eb15e264ccba95b7c`. Next open: `EMEA-C2-TEST`.*
