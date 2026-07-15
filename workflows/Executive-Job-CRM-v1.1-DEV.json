@@ -45,7 +45,7 @@
     {
       "parameters": {
         "mode": "runOnceForEachItem",
-        "jsCode": "const url = String($json.URL || '').trim();\n\nreturn {\n  json: {\n    ...$json,\n    HardReject: false,\n    RejectReason: '',\n    NeedsEnrichment: url.includes('/jobs/view/'),\n    PolicyVersion: '1.1-EMEA',\n    PipelineStage: $json.ExtractionStatus === 'NO_JOB_CARD' ? 'NO_JOB_CARD' : ($json.HardReject === true ? 'POLICY_REJECT' : ''),\n  },\n};"
+        "jsCode": "const url = String($json.URL || '').trim();\n\nconst TITLE_LANG_NAMES = [\n  'spanish', 'german', 'french', 'dutch', 'italian', 'portuguese',\n  'polish', 'czech', 'hungarian', 'romanian', 'greek', 'swedish',\n  'norwegian', 'danish', 'finnish', 'russian', 'ukrainian', 'arabic',\n  'chinese', 'mandarin', 'cantonese', 'japanese', 'korean', 'hindi',\n  'turkish', 'hebrew', 'slovak', 'croatian', 'serbian', 'vietnamese',\n  'thai', 'indonesian', 'malay', 'tagalog', 'flemish', 'catalan',\n];\n\nconst LANG_TITLE_REJECT = 'Mandatory non-English/non-Bulgarian language indicated in title.';\n\nconst isBlockedLanguagePhrase = (phrase) => {\n  const t = String(phrase || '').toLowerCase().trim();\n  if (!t) return false;\n  if (t === 'english' || t === 'bulgarian') return false;\n  if (TITLE_LANG_NAMES.includes(t)) return true;\n  for (const lang of TITLE_LANG_NAMES) {\n    if (new RegExp(`^${lang}\\\\s+(speaker|speaking|fluent|native)\\\\b`).test(t)) return true;\n    if (new RegExp(`\\\\b${lang}\\\\s+(speaker|speaking|fluent|native)\\\\b`).test(t)) return true;\n    if (new RegExp(`\\\\b(speaker|speaking|fluent|native)\\\\s+${lang}\\\\b`).test(t)) return true;\n  }\n  return false;\n};\n\nconst languageInTitleBlocked = (role) => {\n  const title = String(role || '').trim();\n  if (!title) return false;\n\n  for (const paren of title.match(/\\(([^)]+)\\)/g) || []) {\n    if (isBlockedLanguagePhrase(paren.slice(1, -1))) return true;\n  }\n\n  const dashParts = title.split(/\\s+[-\\u2013\\u2014]\\s+/);\n  for (let i = 1; i < dashParts.length; i++) {\n    if (isBlockedLanguagePhrase(dashParts[i])) return true;\n  }\n\n  const lower = title.toLowerCase();\n  for (const lang of TITLE_LANG_NAMES) {\n    if (new RegExp(`\\\\b${lang}\\\\s+(speaker|speaking|fluent|native)\\\\b`).test(lower)) return true;\n  }\n\n  return false;\n};\n\nconst languageTitleBlocked = languageInTitleBlocked($json.Role);\n\nreturn {\n  json: {\n    ...$json,\n    HardReject: false,\n    RejectReason: '',\n    NeedsEnrichment: url.includes('/jobs/view/'),\n    PolicyVersion: '1.1-EMEA',\n    PipelineStage: $json.ExtractionStatus === 'NO_JOB_CARD' ? 'NO_JOB_CARD' : ($json.HardReject === true ? 'POLICY_REJECT' : ''),\n    LanguageTitleBlocked: languageTitleBlocked,\n    LanguageTitleRejectReason: languageTitleBlocked ? LANG_TITLE_REJECT : '',\n  },\n};"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -55,6 +55,55 @@
       ],
       "id": "2fd6841a-a5c0-497a-9c36-90f028556676",
       "name": "Policy Engine"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "emea-language-title-blocked",
+              "leftValue": "={{$json.LanguageTitleBlocked}}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        2816,
+        288
+      ],
+      "id": "a82589e8-fabb-44f2-9fde-6ad7234bf051",
+      "name": "Check Language in Title"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// Language-in-title hard reject — before Preview AI.\nreturn {\n  json: {\n    ...$json,\n    Status: 'Language Rejected',\n    RejectReason: $json.LanguageTitleRejectReason || 'Mandatory non-English/non-Bulgarian language indicated in title.',\n    MainRisk: $json.LanguageTitleRejectReason || 'Mandatory non-English/non-Bulgarian language indicated in title.',\n    FinalDecision: 'REJECT',\n    PipelineStage: 'POLICY_REJECT',\n    auto_reject_reason: 'LANGUAGE',\n    VerifiedRecommendation: 'NO',\n    VerifiedScore: '',\n    VerifiedRisk: '',\n    VerifiedWhyApply: '',\n    FinalCV: '',\n    VerifiedInterviewProbability: '',\n    VerifiedPriority: '',\n    SalaryEstimate: '',\n    SalaryTarget: '',\n    SalaryConfidence: '',\n    SalaryAssumption: '',\n    LocationFit: '',\n    PreviewScore: '',\n    PreviewRecommendation: '',\n    PreviewReason: '',\n    PreviewRisk: '',\n    PreviewCV: '',\n  },\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        6112,
+        480
+      ],
+      "id": "c044db73-29a2-4fad-bb04-dfd424fb23eb",
+      "name": "Build Language Title Reject Record"
     },
     {
       "parameters": {
@@ -80,7 +129,7 @@
       "type": "@n8n/n8n-nodes-langchain.openAi",
       "typeVersion": 2.3,
       "position": [
-        2816,
+        3040,
         288
       ],
       "id": "6f304764-6bd6-491c-b3ab-4df94fcd7c24",
@@ -1790,9 +1839,38 @@
       "main": [
         [
           {
+            "node": "Check Language in Title",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Language in Title": {
+      "main": [
+        [
+          {
+            "node": "Build Language Title Reject Record",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
             "node": "AI - Preview Score Job",
             "type": "main",
             "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Language Title Reject Record": {
+      "main": [
+        [
+          {
+            "node": "Merge Final Records",
+            "type": "main",
+            "index": 1
           }
         ]
       ]
