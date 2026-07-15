@@ -1809,6 +1809,69 @@
     {
       "parameters": {
         "mode": "runOnceForEachItem",
+        "jsCode": "const MIN_FULL_JOB_TEXT = 200;\nconst TRAVEL_LIMIT = 20;\n\nconst TRAVEL_CTX = /\\b(travel|travelling|traveling|on[- ]site|on the road)\\b/i;\nconst SOFT_TRAVEL = /\\b(occasional|optional|preferred|nice to have|highly desirable|desirable|a plus|ideally|willingness to|willing to)\\b/i;\nconst MANDATORY_TRAVEL = /\\b(required|as required|must|mandatory|essential|need to|expected to|will be required|minimum|at least)\\b/i;\n\nconst parseTravelPercentMax = (chunk) => {\n  const c = String(chunk || '').replace(/[–—]/g, '-');\n  let m = c.match(/(\\d{1,2})\\s*-\\s*(\\d{1,2})\\s*%/);\n  if (m) {\n    const lo = parseInt(m[1], 10);\n    const hi = parseInt(m[2], 10);\n    return { max: Math.max(lo, hi), label: `${lo}-${hi}%` };\n  }\n  m = c.match(/up\\s+to\\s+(\\d{1,2})\\s*%/i);\n  if (m) return { max: parseInt(m[1], 10), label: `up to ${m[1]}%` };\n  m = c.match(/(?:minimum|min(?:imum)?|at least)\\s+(\\d{1,2})\\s*%/i);\n  if (m) return { max: parseInt(m[1], 10), label: `minimum ${m[1]}%` };\n  m = c.match(/(\\d{1,2})\\s*%\\s*\\+/i);\n  if (m) return { max: parseInt(m[1], 10), label: `${m[1]}%+` };\n  m = c.match(/(\\d{1,2})\\s*%/);\n  if (m) return { max: parseInt(m[1], 10), label: `${m[1]}%` };\n  return null;\n};\n\nconst isExplicitMandatoryTravel = (chunk) => {\n  if (MANDATORY_TRAVEL.test(chunk)) return true;\n  if (/\\d{1,2}\\s*%\\+?\\s*travel/i.test(chunk)) return true;\n  if (/\\btravel\\b[^.]{0,80}\\b(required|as required|mandatory|must)\\b/i.test(chunk)) return true;\n  if (/\\b(required|as required|mandatory|must|minimum|at least)\\b[^.]{0,80}\\btravel\\b/i.test(chunk)) return true;\n  return false;\n};\n\nconst detectMandatoryTravelBlock = (fullJobText) => {\n  const text = String(fullJobText || '').trim();\n  if (text.length < MIN_FULL_JOB_TEXT) return { blocked: false, reason: '', percentMax: '' };\n\n  const chunks = text.split(/[.;\\n]/).map((c) => c.trim()).filter((c) => c.length >= 10);\n  for (const chunk of chunks) {\n    if (!TRAVEL_CTX.test(chunk)) continue;\n    if (/\\b(?:travel|travelling|traveling)\\b[^.]{0,100}\\bmay\\s+be\\s+required\\b/i.test(chunk)) continue;\n\n    const parsed = parseTravelPercentMax(chunk);\n    if (!parsed) continue;\n    if (parsed.max <= TRAVEL_LIMIT) continue;\n    if (SOFT_TRAVEL.test(chunk) && !isExplicitMandatoryTravel(chunk)) continue;\n    if (!isExplicitMandatoryTravel(chunk)) continue;\n\n    return {\n      blocked: true,\n      reason: `Mandatory travel above 20%: ${parsed.label}`,\n      percentMax: String(parsed.max),\n    };\n  }\n\n  return { blocked: false, reason: '', percentMax: '' };\n};\n\nconst fullJobText = String($json.FullJobText || '').trim();\nconst enrichmentOk =\n  String($json.EnrichmentStatus || '') === 'OK' && fullJobText.length >= MIN_FULL_JOB_TEXT;\nconst block = enrichmentOk\n  ? detectMandatoryTravelBlock(fullJobText)\n  : { blocked: false, reason: '', percentMax: '' };\n\nreturn {\n  json: {\n    ...$json,\n    MandatoryTravelBlocked: block.blocked,\n    MandatoryTravelRejectReason: block.reason || '',\n    MandatoryTravelPercentMax: block.percentMax || '',\n  },\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        5256,
+        128
+      ],
+      "id": "f8a91c2e-4d5b-4e6a-9c1f-7e3a8b2d4c6e",
+      "name": "Mandatory Travel Gate"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "emea-mandatory-travel-blocked",
+              "leftValue": "={{$json.MandatoryTravelBlocked}}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        5376,
+        128
+      ],
+      "id": "a2b3c4d5-e6f7-4890-a123-b4c5d6e7f890",
+      "name": "Check Mandatory Travel"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// EMEA-TRAVEL mandatory travel hard reject — before Verified AI.\nreturn {\n  json: {\n    ...$json,\n    Status: 'Hard Eligibility Reject',\n    RejectReason: $json.MandatoryTravelRejectReason || 'Mandatory travel above 20%',\n    MainRisk: $json.MandatoryTravelRejectReason || 'Mandatory travel above 20%',\n    FinalDecision: 'REJECT',\n    PipelineStage: 'FINAL_REJECT',\n    auto_reject_reason: 'MANDATORY_TRAVEL',\n    VerifiedRecommendation: 'NO',\n    VerifiedScore: '',\n    VerifiedRisk: '',\n    VerifiedWhyApply: '',\n    FinalCV: '',\n    VerifiedInterviewProbability: '',\n    VerifiedPriority: '',\n    SalaryEstimate: '',\n    SalaryRange: '',\n    SalaryTarget: '',\n    SalaryConfidence: '',\n    SalaryAssumption: '',\n    LocationFit: '',\n  },\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        6112,
+        128
+      ],
+      "id": "b3c4d5e6-f7a8-4901-b234-c5d6e7f89012",
+      "name": "Build Mandatory Travel Reject Record"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
         "jsCode": "const MIN_FULL_JOB_TEXT = 200;\n\nconst SOFT_PREFERENCE_ONLY = /\\b(preferred|nice to have|highly desirable|desirable|advantageous|a plus|ideally|would be (?:a )?bonus)\\b/i;\n\nconst DOMAIN_RULES = [\n  {\n    domainPatterns: [\n      /\\bigaming\\b/i,\n      /\\bregulated\\s+(?:gambling|gaming)\\s+markets?\\b/i,\n      /\\bonline\\s+(?:gambling|gaming|casino)\\b/i,\n      /\\bgambling\\s+brands?\\b/i,\n    ],\n    label: 'iGaming / regulated gambling',\n  },\n  {\n    domainPatterns: [\n      /\\bclinical\\b/i,\n      /\\bclinical trial\\b/i,\n      /\\bclinical operations\\b/i,\n      /\\bgcp\\b/i,\n      /\\bich\\b/i,\n    ],\n    label: 'clinical',\n  },\n  {\n    domainPatterns: [\n      /\\bhome\\s+care\\b/i,\n      /\\bhealth\\s*care\\b/i,\n      /\\bhealthcare\\b/i,\n      /\\belderly\\s+care\\b/i,\n      /\\bnursing\\s+care\\b/i,\n      /\\bhomecare\\b/i,\n    ],\n    label: 'healthcare / home care',\n  },\n  {\n    domainPatterns: [\n      /\\bregulated\\s+financial\\b/i,\n      /\\bbanking\\s+regulatory\\b/i,\n      /\\bpharma(?:ceutical)?\\b/i,\n      /\\bmedtech\\b/i,\n    ],\n    label: 'regulated financial / pharma',\n  },\n];\n\nconst hasMandatoryLanguage = (chunk) => {\n  const c = String(chunk || '');\n  if (!c.trim()) return false;\n  if (SOFT_PREFERENCE_ONLY.test(c) && !/\\b(mandatory|required|must have|must possess|essential)\\b/i.test(c)) {\n    return false;\n  }\n  return (\n    /\\b(is\\s+)?mandatory\\b/i.test(c)\n    || /\\b(required|must have|must possess|essential requirement|non-negotiable)\\b/i.test(c)\n    || (/\\b(?:minimum|at least)\\s+\\d+\\+?\\s*years?\\b/i.test(c) && /\\b(?:experience|background|track record)\\b/i.test(c))\n    || /\\d+\\+?\\s*years?[^.]{0,120}\\b(?:is\\s+)?(?:mandatory|required|essential)\\b/i.test(c)\n    || /\\bproven\\s+(?:senior\\s+)?(?:leadership\\s+)?experience\\s+within\\b/i.test(c)\n  );\n};\n\nconst hasSpecializedExperienceContext = (chunk) =>\n  /\\b(?:years?|experience|background|track record|prior|leading|expertise|proven|leadership)\\b/i.test(chunk);\n\nconst detectMandatorySpecializedDomainBlock = (fullJobText) => {\n  const text = String(fullJobText || '').trim();\n  if (text.length < MIN_FULL_JOB_TEXT) return { blocked: false, reason: '', domain: '' };\n\n  const chunks = text.split(/[.;\\n]/).map((c) => c.trim()).filter((c) => c.length > 20);\n  for (const chunk of chunks) {\n    if (!hasMandatoryLanguage(chunk) || !hasSpecializedExperienceContext(chunk)) continue;\n\n    for (const rule of DOMAIN_RULES) {\n      if (rule.domainPatterns.some((re) => re.test(chunk))) {\n        return {\n          blocked: true,\n          domain: rule.label,\n          reason: `Mandatory specialized domain experience: ${rule.label}`,\n        };\n      }\n    }\n  }\n\n  return { blocked: false, reason: '', domain: '' };\n};\n\nconst fullJobText = String($json.FullJobText || '').trim();\nconst enrichmentOk =\n  String($json.EnrichmentStatus || '') === 'OK' && fullJobText.length >= MIN_FULL_JOB_TEXT;\nconst block = enrichmentOk\n  ? detectMandatorySpecializedDomainBlock(fullJobText)\n  : { blocked: false, reason: '', domain: '' };\n\nreturn {\n  json: {\n    ...$json,\n    MandatoryDomainBlocked: block.blocked,\n    MandatoryDomainRejectReason: block.reason || '',\n    MandatoryDomainLabel: block.domain || '',\n  },\n};"
       },
       "type": "n8n-nodes-base.code",
@@ -2428,9 +2491,49 @@
         ],
         [
           {
+            "node": "Mandatory Travel Gate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mandatory Travel Gate": {
+      "main": [
+        [
+          {
+            "node": "Check Mandatory Travel",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Mandatory Travel": {
+      "main": [
+        [
+          {
+            "node": "Build Mandatory Travel Reject Record",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
             "node": "Mandatory Domain Gate",
             "type": "main",
             "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Mandatory Travel Reject Record": {
+      "main": [
+        [
+          {
+            "node": "Merge Final Records",
+            "type": "main",
+            "index": 1
           }
         ]
       ]
