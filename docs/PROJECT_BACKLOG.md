@@ -28,9 +28,9 @@ Use these statuses on every tracked item (commit, gate, or backlog ID):
 | Item | Value |
 |------|--------|
 | **Branch** | `emea-v1.1` |
-| **Commit** | `3ebeaf0326afc5a2a623cb6eb15e264ccba95b7c` — `fix(emea): C2.1 proven-within mandatory domain detection` |
+| **Commit** | `7ccdf7c5a96210adf14b18eac0b2986365383059` — `restore(emea): closed-posting gate before Verified` |
 | **Workflow file** | `workflows/Executive-Job-CRM-v1.1-DEV.json` |
-| **Nodes / connections** | 46 / 54 |
+| **Nodes / connections** | 48 / 57 |
 | **Regression label** | `jobs-exec-crm-regression` |
 | **DEV spreadsheet** | `Executive Job CRM - EMEA DEV` (`1x_f_DK5yi3FprfIo2w1Pf1Q9VaAeUeMm66gOnR7igJs`) |
 
@@ -42,12 +42,14 @@ Policy Engine → Check Language in Title
   FALSE → AI - Preview Score Job → …
 ```
 
-### Post-Extract pre-Verified chain (C2)
+### Post-Extract pre-Verified chain (C2 + C6)
 
 ```
-Extract LinkedIn Job Description → Mandatory Domain Gate → Check Mandatory Domain
-  TRUE  → Build Mandatory Domain Reject Record → Merge Final Records (input 1)
-  FALSE → AI - Verified Review → Normalize Verified Review → …
+Extract LinkedIn Job Description → Check Posting Closed
+  TRUE  → Build Closed Posting Reject Record → Merge Final Records (input 1)
+  FALSE → Mandatory Domain Gate → Check Mandatory Domain
+            TRUE  → Build Mandatory Domain Reject Record → Merge Final Records (input 1)
+            FALSE → AI - Verified Review → Normalize Verified Review → …
 ```
 
 ### Frozen (do not change without explicit approval)
@@ -131,13 +133,21 @@ Pre-Verified gate work from v17 reference. One commit per gate unless noted.
 | OPEN | **EMEA-C3** | Mandatory language (FullJobText) | Post-Extract chain |
 | OPEN | **EMEA-C4** | Country-list remote / explicit residency | Post-Extract chain |
 | OPEN | **EMEA-C5** | Founder / co-founder role | Post-Extract chain; immediate predecessor to Verified |
-| OPEN | **EMEA-C6** | Closed posting (guest HTML markers) | First gate after Extract; requires minimal Extract patch |
+| DONE | `7ccdf7c5a96210adf14b18eac0b2986365383059` | **C6 — Closed posting (guest HTML markers)** | `Check Posting Closed` first after Extract; Mokrogoria fail-open |
 
-**Target enrichment topology (after C3–C6):**
+**Target enrichment topology (after C3–C5):**
 
 ```
 Extract → Closed → Country-list → Domain → Language → Founder → AI - Verified Review
 ```
+
+### Known coverage ceiling — closed posting (C6)
+
+| Case | JobId | Guest marker in raw HTTP | Gate behavior |
+|------|-------|--------------------------|---------------|
+| Hard-close control | `3900000000` | Yes (`closed-job__flavor--closed` + phrase) | `FINAL_REJECT` / `Status: Closed` |
+| Mokrogoria | `4437213682` | **No** — UI shows closed; guest HTML does not | **Fail open** → continues to downstream gates / Verified |
+| Fulchester | `4434499750` | Yes when guest serves closed stub; may be absent when guest-open at fetch time | REJECT when marker present; fail open otherwise |
 
 ---
 
@@ -216,6 +226,20 @@ Extract → Closed → Country-list → Domain → Language → Founder → AI -
 
 When `EnrichmentStatus` is not `OK` or `FullJobTextLength < 200`, deterministic post-Extract gates must **fail open** (do not hard-reject on missing posting text). Verified AI may still evaluate thin context.
 
+**Exception — C6 closed posting:** scans **raw guest HTTP HTML** inside Extract. May reject with `EnrichmentStatus: FAILED` when guest serves a closed stub without extractable description. Absence of closed markers always fail-opens.
+
+### Closed-posting gate (C6)
+
+| Case | Input / condition | Expected |
+|------|-------------------|----------|
+| **A. Hard-close control** | JobId `3900000000`; raw guest HTML has `closed-job__flavor--closed` or phrase | `FINAL_REJECT` before Verified; `Status: Closed`; `auto_reject_reason: CLOSED_POSTING` |
+| **B. Open control** | JobId `4440043160`; no closed markers | Pass to Mandatory Domain Gate |
+| **C. Mokrogoria (fail-open)** | JobId `4437213682`; UI closed, guest HTML has no marker | Pass through C6; may reach Verified |
+| **D. Fulchester (when stub)** | JobId `4434499750`; guest stub with markers | `FINAL_REJECT` before Verified |
+| **E. NO_URL path** | Missing/invalid URL | No HTTP; C6 skipped |
+| **F. HTTP error** | 403 / 429 / empty body | C6 fail-open |
+| **G. C2 integrity** | Mill `4436662085` mandatory domain | Unchanged downstream behavior when C6 does not fire |
+
 ### Protected paths (must not regress)
 
 | Path | Rule |
@@ -229,6 +253,7 @@ When `EnrichmentStatus` is not `OK` or `FullJobTextLength < 200`, deterministic 
 
 | Status | Target | Command |
 |--------|--------|---------|
+| DONE | C6 only (`7ccdf7c5a96210adf14b18eac0b2986365383059`) | `git revert 7ccdf7c5a96210adf14b18eac0b2986365383059` |
 | DONE | C2.1 only (`3ebeaf0326afc5a2a623cb6eb15e264ccba95b7c`) | `git revert 3ebeaf0326afc5a2a623cb6eb15e264ccba95b7c` |
 | DONE | C2 structural (`8773158`) | `git checkout 8773158 -- workflows/Executive-Job-CRM-v1.1-DEV.json` |
 | SUPERSEDED | Misplaced C2 (`9acb019`) | `git checkout 9acb019 -- workflows/Executive-Job-CRM-v1.1-DEV.json` |
@@ -237,4 +262,4 @@ When `EnrichmentStatus` is not `OK` or `FullJobTextLength < 200`, deterministic 
 
 ---
 
-*Last updated: 2026-07-15 — baseline `3ebeaf0326afc5a2a623cb6eb15e264ccba95b7c` (DONE). `EMEA-C2.1` DONE at `3ebeaf0326afc5a2a623cb6eb15e264ccba95b7c`. Next open: `EMEA-C2-TEST`.*
+*Last updated: 2026-07-15 — baseline `7ccdf7c5a96210adf14b18eac0b2986365383059` (DONE). `EMEA-C6` DONE at `7ccdf7c5a96210adf14b18eac0b2986365383059`. Mokrogoria remains fail-open when guest HTML has no closure marker. Next open: `EMEA-C2-TEST`.*
