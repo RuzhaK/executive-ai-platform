@@ -45,7 +45,7 @@
     {
       "parameters": {
         "mode": "runOnceForEachItem",
-        "jsCode": "const url = String($json.URL || '').trim();\n\nconst TITLE_LANG_NAMES = [\n  'spanish', 'german', 'french', 'dutch', 'italian', 'portuguese',\n  'polish', 'czech', 'hungarian', 'romanian', 'greek', 'swedish',\n  'norwegian', 'danish', 'finnish', 'russian', 'ukrainian', 'arabic',\n  'chinese', 'mandarin', 'cantonese', 'japanese', 'korean', 'hindi',\n  'turkish', 'hebrew', 'slovak', 'croatian', 'serbian', 'vietnamese',\n  'thai', 'indonesian', 'malay', 'tagalog', 'flemish', 'catalan',\n];\n\nconst LANG_TITLE_REJECT = 'Mandatory non-English/non-Bulgarian language indicated in title.';\n\nconst isBlockedLanguagePhrase = (phrase) => {\n  const t = String(phrase || '').toLowerCase().trim();\n  if (!t) return false;\n  if (t === 'english' || t === 'bulgarian') return false;\n  if (TITLE_LANG_NAMES.includes(t)) return true;\n  for (const lang of TITLE_LANG_NAMES) {\n    if (new RegExp(`^${lang}\\\\s+(speaker|speaking|fluent|native)\\\\b`).test(t)) return true;\n    if (new RegExp(`\\\\b${lang}\\\\s+(speaker|speaking|fluent|native)\\\\b`).test(t)) return true;\n    if (new RegExp(`\\\\b(speaker|speaking|fluent|native)\\\\s+${lang}\\\\b`).test(t)) return true;\n  }\n  return false;\n};\n\nconst languageInTitleBlocked = (role) => {\n  const title = String(role || '').trim();\n  if (!title) return false;\n\n  for (const paren of title.match(/\\(([^)]+)\\)/g) || []) {\n    if (isBlockedLanguagePhrase(paren.slice(1, -1))) return true;\n  }\n\n  const dashParts = title.split(/\\s+[-\\u2013\\u2014]\\s+/);\n  for (let i = 1; i < dashParts.length; i++) {\n    if (isBlockedLanguagePhrase(dashParts[i])) return true;\n  }\n\n  const lower = title.toLowerCase();\n  for (const lang of TITLE_LANG_NAMES) {\n    if (new RegExp(`\\\\b${lang}\\\\s+(speaker|speaking|fluent|native)\\\\b`).test(lower)) return true;\n  }\n\n  return false;\n};\n\nconst languageTitleBlocked = languageInTitleBlocked($json.Role);\n\nreturn {\n  json: {\n    ...$json,\n    HardReject: false,\n    RejectReason: '',\n    NeedsEnrichment: url.includes('/jobs/view/'),\n    PolicyVersion: '1.1-EMEA',\n    PipelineStage: $json.ExtractionStatus === 'NO_JOB_CARD' ? 'NO_JOB_CARD' : ($json.HardReject === true ? 'POLICY_REJECT' : ''),\n    LanguageTitleBlocked: languageTitleBlocked,\n    LanguageTitleRejectReason: languageTitleBlocked ? LANG_TITLE_REJECT : '',\n  },\n};"
+        "jsCode": "const url = String($json.URL || '').trim();\n\nconst TITLE_LANG_NAMES = [\n  'spanish', 'german', 'french', 'dutch', 'italian', 'portuguese',\n  'polish', 'czech', 'hungarian', 'romanian', 'greek', 'swedish',\n  'norwegian', 'danish', 'finnish', 'russian', 'ukrainian', 'arabic',\n  'chinese', 'mandarin', 'cantonese', 'japanese', 'korean', 'hindi',\n  'turkish', 'hebrew', 'slovak', 'croatian', 'serbian', 'vietnamese',\n  'thai', 'indonesian', 'malay', 'tagalog', 'flemish', 'catalan',\n];\n\nconst LANG_TITLE_REJECT = 'Mandatory non-English/non-Bulgarian language indicated in title.';\n\nconst isBlockedLanguagePhrase = (phrase) => {\n  const t = String(phrase || '').toLowerCase().trim();\n  if (!t) return false;\n  if (t === 'english' || t === 'bulgarian') return false;\n  if (TITLE_LANG_NAMES.includes(t)) return true;\n  for (const lang of TITLE_LANG_NAMES) {\n    if (new RegExp(`^${lang}\\\\s+(speaker|speaking|fluent|native)\\\\b`).test(t)) return true;\n    if (new RegExp(`\\\\b${lang}\\\\s+(speaker|speaking|fluent|native)\\\\b`).test(t)) return true;\n    if (new RegExp(`\\\\b(speaker|speaking|fluent|native)\\\\s+${lang}\\\\b`).test(t)) return true;\n  }\n  return false;\n};\n\nconst languageInTitleBlocked = (role) => {\n  const title = String(role || '').trim();\n  if (!title) return false;\n\n  for (const paren of title.match(/\\(([^)]+)\\)/g) || []) {\n    if (isBlockedLanguagePhrase(paren.slice(1, -1))) return true;\n  }\n\n  const dashParts = title.split(/\\s+[-\\u2013\\u2014]\\s+/);\n  for (let i = 1; i < dashParts.length; i++) {\n    if (isBlockedLanguagePhrase(dashParts[i])) return true;\n  }\n\n  const lower = title.toLowerCase();\n  for (const lang of TITLE_LANG_NAMES) {\n    if (new RegExp(`\\\\b${lang}\\\\s+(speaker|speaking|fluent|native)\\\\b`).test(lower)) return true;\n  }\n\n  return false;\n};\n\nconst languageTitleBlocked = languageInTitleBlocked($json.Role);\n\nconst SOFT_PREFERENCE_ONLY = /\\b(preferred|nice to have|highly desirable|desirable|advantageous|a plus|ideally|would be (?:a )?bonus)\\b/i;\n\nconst DOMAIN_RULES = [\n  {\n    domainPatterns: [\n      /\\bigaming\\b/i,\n      /\\bregulated\\s+(?:gambling|gaming)\\s+markets?\\b/i,\n      /\\bonline\\s+(?:gambling|gaming|casino)\\b/i,\n      /\\bgambling\\s+brands?\\b/i,\n    ],\n    label: 'iGaming / regulated gambling',\n  },\n  {\n    domainPatterns: [\n      /\\bclinical\\b/i,\n      /\\bclinical trial\\b/i,\n      /\\bclinical operations\\b/i,\n      /\\bgcp\\b/i,\n      /\\bich\\b/i,\n    ],\n    label: 'clinical',\n  },\n  {\n    domainPatterns: [\n      /\\bhome\\s+care\\b/i,\n      /\\belderly\\s+care\\b/i,\n      /\\bnursing\\s+care\\b/i,\n      /\\bhomecare\\b/i,\n    ],\n    label: 'healthcare / home care',\n  },\n  {\n    domainPatterns: [\n      /\\bregulated\\s+financial\\b/i,\n      /\\bbanking\\s+regulatory\\b/i,\n      /\\bpharma(?:ceutical)?\\b/i,\n      /\\bmedtech\\b/i,\n    ],\n    label: 'regulated financial / pharma',\n  },\n];\n\nconst hasMandatoryLanguage = (chunk) => {\n  const c = String(chunk || '');\n  if (!c.trim()) return false;\n  if (SOFT_PREFERENCE_ONLY.test(c) && !/\\b(mandatory|required|must have|must possess|essential)\\b/i.test(c)) {\n    return false;\n  }\n  return (\n    /\\b(is\\s+)?mandatory\\b/i.test(c)\n    || /\\b(required|must have|must possess|essential requirement|non-negotiable)\\b/i.test(c)\n    || (/\\b(?:minimum|at least)\\s+\\d+\\+?\\s*years?\\b/i.test(c) && /\\b(?:experience|background|track record)\\b/i.test(c))\n    || /\\d+\\+?\\s*years?[^.]{0,120}\\b(?:is\\s+)?(?:mandatory|required|essential)\\b/i.test(c)\n  );\n};\n\nconst hasSpecializedExperienceContext = (chunk) =>\n  /\\b(?:years?|experience|background|track record|prior|leading|expertise|proven|leadership)\\b/i.test(chunk);\n\nconst detectMandatorySpecializedDomainBlock = (cardText) => {\n  const text = String(cardText || '').trim();\n  if (!text) return { blocked: false, reason: '', domain: '' };\n\n  const chunks = text.split(/[.;\\n]/).map((c) => c.trim()).filter((c) => c.length >= 15);\n  for (const chunk of chunks) {\n    if (!hasMandatoryLanguage(chunk) || !hasSpecializedExperienceContext(chunk)) continue;\n\n    for (const rule of DOMAIN_RULES) {\n      if (rule.domainPatterns.some((re) => re.test(chunk))) {\n        return {\n          blocked: true,\n          domain: rule.label,\n          reason: `Mandatory specialized domain experience: ${rule.label}`,\n        };\n      }\n    }\n  }\n\n  return { blocked: false, reason: '', domain: '' };\n};\n\nconst preHttpContext = [\n  $json.Role,\n  $json.EmailSnippet,\n  $json.EmailSubject,\n  $json.Notes,\n].filter(Boolean).join('\\n');\n\nconst mandatoryDomainBlock = detectMandatorySpecializedDomainBlock(preHttpContext);\n\nreturn {\n  json: {\n    ...$json,\n    HardReject: false,\n    RejectReason: '',\n    NeedsEnrichment: url.includes('/jobs/view/'),\n    PolicyVersion: '1.1-EMEA',\n    PipelineStage: $json.ExtractionStatus === 'NO_JOB_CARD' ? 'NO_JOB_CARD' : ($json.HardReject === true ? 'POLICY_REJECT' : ''),\n    LanguageTitleBlocked: languageTitleBlocked,\n    LanguageTitleRejectReason: languageTitleBlocked ? LANG_TITLE_REJECT : '',\n    MandatoryDomainBlocked: mandatoryDomainBlock.blocked,\n    MandatoryDomainRejectReason: mandatoryDomainBlock.reason || '',\n  },\n};"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -104,6 +104,55 @@
       ],
       "id": "c044db73-29a2-4fad-bb04-dfd424fb23eb",
       "name": "Build Language Title Reject Record"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "emea-mandatory-domain-blocked",
+              "leftValue": "={{$json.MandatoryDomainBlocked}}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        2928,
+        288
+      ],
+      "id": "f37b9471-2c92-4102-869e-8f2909e37637",
+      "name": "Check Mandatory Domain"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// Mandatory specialized-domain hard reject — before Preview AI.\nreturn {\n  json: {\n    ...$json,\n    Status: 'Mandatory Domain Rejected',\n    RejectReason: $json.MandatoryDomainRejectReason || 'Mandatory specialized domain experience',\n    MainRisk: $json.MandatoryDomainRejectReason || 'Mandatory specialized domain experience',\n    FinalDecision: 'REJECT',\n    PipelineStage: 'POLICY_REJECT',\n    auto_reject_reason: 'MANDATORY_DOMAIN',\n    VerifiedRecommendation: 'NO',\n    VerifiedScore: '',\n    VerifiedRisk: '',\n    VerifiedWhyApply: '',\n    FinalCV: '',\n    VerifiedInterviewProbability: '',\n    VerifiedPriority: '',\n    SalaryEstimate: '',\n    SalaryTarget: '',\n    SalaryConfidence: '',\n    SalaryAssumption: '',\n    LocationFit: '',\n    PreviewScore: '',\n    PreviewRecommendation: '',\n    PreviewReason: '',\n    PreviewRisk: '',\n    PreviewCV: '',\n  },\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        6112,
+        672
+      ],
+      "id": "235f6524-c5fa-4eda-a296-ae5954e5d086",
+      "name": "Build Mandatory Domain Reject Record"
     },
     {
       "parameters": {
@@ -1857,9 +1906,38 @@
         ],
         [
           {
+            "node": "Check Mandatory Domain",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Mandatory Domain": {
+      "main": [
+        [
+          {
+            "node": "Build Mandatory Domain Reject Record",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
             "node": "AI - Preview Score Job",
             "type": "main",
             "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Mandatory Domain Reject Record": {
+      "main": [
+        [
+          {
+            "node": "Merge Final Records",
+            "type": "main",
+            "index": 1
           }
         ]
       ]
