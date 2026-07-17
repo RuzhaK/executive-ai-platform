@@ -48,7 +48,7 @@ Use these statuses on every tracked item (commit, gate, or backlog ID):
 | Item | Value |
 |------|--------|
 | **Branch** | `emea-v1.1` |
-| **Commit** | `570c097e669dd1bb9d3d72facd0be1fef8970a1e` — `feat(emea): mandatory travel gate before Verified` |
+| **Commit** | `355c91b33fb0fa18907e972a3c632fcd51aff1f4` — `fix(emea): scan full FullJobText in mandatory travel gate` |
 | **Workflow file** | `workflows/Executive-Job-CRM-v1.1-DEV.json` |
 | **Nodes / connections** | 51 / 61 |
 | **Regression label** | `jobs-exec-crm-regression` |
@@ -106,6 +106,27 @@ Under `Executive Opportunity Intelligence Platform/backups/EMEA BACKUPs/`:
 | **Root cause (pre-fix)** | `hasMandatoryLanguage()` did not recognize **“Proven … experience within …”** phrasing. Domain patterns (`home care`, `healthcare`) are present and would match if mandatory language fired. |
 | **Fix shipped** | Added to `hasMandatoryLanguage` return: `/\bproven\s+(?:senior\s+)?(?:leadership\s+)?experience\s+within\b/i` |
 
+### Known regression pass — Fulchester travel (EMEA-TRAVEL DONE + validated)
+
+| Field | Value |
+|-------|--------|
+| **Backlog ID** | `EMEA-TRAVEL` |
+| **Status** | **DONE — regression-validated (n8n)** |
+| **Gate commit** | `570c097e669dd1bb9d3d72facd0be1fef8970a1e` |
+| **Fix commit** | `355c91b33fb0fa18907e972a3c632fcd51aff1f4` |
+| **Company** | Fulchester Consultants |
+| **Role** | Managing Director |
+| **JobId** | `4434499750` |
+| **EnrichmentStatus** | `OK` |
+| **FullJobTextLength** | `3304` |
+| **FinalDecision** | `REJECT` |
+| **PipelineStage** | `FINAL_REJECT` |
+| **RejectReason** | `Mandatory travel above 20%: 20-30%` |
+| **auto_reject_reason** | `MANDATORY_TRAVEL` |
+| **Trigger sentence** | *Travel across the region as required (approx. 20–30%, flexible based on business needs).* |
+| **Fix shipped** | Option A — scan full `FullJobText` before period-split chunks (`355c91b`) |
+| **Out of scope** | Output-field normalization (separate future backlog item) |
+
 ---
 
 ## Completed Work
@@ -156,7 +177,7 @@ Pre-Verified gate work from v17 reference. One commit per gate unless noted.
 | OPEN | **EMEA-C4** | Country-list remote / explicit residency | Post-Extract chain |
 | OPEN | **EMEA-C5** | Founder / co-founder role | Post-Extract chain; immediate predecessor to Verified |
 | DONE | `7ccdf7c5a96210adf14b18eac0b2986365383059` | **C6 — Closed posting (guest HTML markers)** | `Check Posting Closed` first after Extract; Mokrogoria fail-open |
-| DONE | `570c097e669dd1bb9d3d72facd0be1fef8970a1e` | **EMEA-TRAVEL — Mandatory travel >20%** | After C6, before C2; Fulchester `4434499750` travel sentence |
+| DONE | `355c91b33fb0fa18907e972a3c632fcd51aff1f4` | **EMEA-TRAVEL — Mandatory travel >20%** | Gate `570c097`; chunk fix `355c91b`; **n8n validated** Fulchester `4434499750` |
 
 **Target enrichment topology (after C3–C5):**
 
@@ -187,7 +208,7 @@ Extract → Closed → Country-list → Domain → Language → Founder → AI -
 
 | Status | ID | Item | Notes |
 |--------|-----|------|-------|
-| DONE | **EMEA-TRAVEL** | Mandatory travel **>20%** hard reject | Commit `570c097e669dd1bb9d3d72facd0be1fef8970a1e`; Fulchester `4434499750`: *"Travel across the region as required (approx. 20–30%)"* |
+| DONE | **EMEA-TRAVEL** | Mandatory travel **>20%** hard reject | **Regression-validated (n8n).** Gate `570c097`; fix `355c91b`; Fulchester `4434499750` passed |
 | OPEN | **EMEA-TZ** | Mandatory incompatible timezone | Verified Stage 1 prompt only; no pre-Verified gate |
 
 ### P2 — Verified / calibration (prompt-only, when approved)
@@ -210,6 +231,7 @@ Extract → Closed → Country-list → Domain → Language → Founder → AI -
 
 | Status | ID | Item |
 |--------|-----|------|
+| OPEN | **EMEA-OUTPUT-NORM** | Output-field normalization (runtime/sheet display vs internal gate fields) — **not part of EMEA-TRAVEL** |
 | OPEN | **DOC-ARCH** | Reconcile `docs/architecture/WORKFLOW_ARCHITECTURE.md` with post-C2 topology (46 nodes) |
 | OPEN | **DOC-SHEET** | Fix `Company = System.Xml.XmlElement` append mapping noted in v13 export |
 
@@ -264,11 +286,11 @@ When `EnrichmentStatus` is not `OK` or `FullJobTextLength < 200`, deterministic 
 | **F. HTTP error** | 403 / 429 / empty body | C6 fail-open |
 | **G. C2 integrity** | Mill `4436662085` mandatory domain | Unchanged downstream behavior when C6 does not fire |
 
-### Mandatory-travel gate (EMEA-TRAVEL — `570c097e669dd1bb9d3d72facd0be1fef8970a1e` DONE)
+### Mandatory-travel gate (EMEA-TRAVEL — `355c91b33fb0fa18907e972a3c632fcd51aff1f4` validated)
 
 | Case | Input / condition | Expected |
 |------|-------------------|----------|
-| **A. Fulchester travel** | JobId `4434499750`; `FullJobText` contains *"Travel across the region as required (approx. 20–30%)"* | `FINAL_REJECT` before Verified; `auto_reject_reason: MANDATORY_TRAVEL` |
+| **A. Fulchester travel (PASSED n8n)** | JobId `4434499750`; `EnrichmentStatus=OK`; `FullJobTextLength=3304`; travel *"as required (approx. 20–30%)"* | `FINAL_REJECT`; `RejectReason: Mandatory travel above 20%: 20-30%`; `auto_reject_reason: MANDATORY_TRAVEL` |
 | **B. Up to 20%** | *"Up to 20% travel required"* | Pass |
 | **C. Range 10–20%** | *"10–20% travel required"* | Pass |
 | **D. Single 25%** | *"25% travel required"* | REJECT |
@@ -293,7 +315,8 @@ When `EnrichmentStatus` is not `OK` or `FullJobTextLength < 200`, deterministic 
 
 | Status | Target | Command |
 |--------|--------|---------|
-| DONE | EMEA-TRAVEL only (`570c097e669dd1bb9d3d72facd0be1fef8970a1e`) | `git revert 570c097e669dd1bb9d3d72facd0be1fef8970a1e` |
+| DONE | EMEA-TRAVEL fix only (`355c91b33fb0fa18907e972a3c632fcd51aff1f4`) | `git revert 355c91b33fb0fa18907e972a3c632fcd51aff1f4` |
+| DONE | EMEA-TRAVEL gate only (`570c097e669dd1bb9d3d72facd0be1fef8970a1e`) | `git revert 570c097e669dd1bb9d3d72facd0be1fef8970a1e` |
 | DONE | C6 only (`7ccdf7c5a96210adf14b18eac0b2986365383059`) | `git revert 7ccdf7c5a96210adf14b18eac0b2986365383059` |
 | DONE | C2.1 only (`3ebeaf0326afc5a2a623cb6eb15e264ccba95b7c`) | `git revert 3ebeaf0326afc5a2a623cb6eb15e264ccba95b7c` |
 | DONE | C2 structural (`8773158`) | `git checkout 8773158 -- workflows/Executive-Job-CRM-v1.1-DEV.json` |
@@ -303,4 +326,4 @@ When `EnrichmentStatus` is not `OK` or `FullJobTextLength < 200`, deterministic 
 
 ---
 
-*Last updated: 2026-07-15 — baseline `570c097e669dd1bb9d3d72facd0be1fef8970a1e` (DONE). `EMEA-TRAVEL` DONE at `570c097e669dd1bb9d3d72facd0be1fef8970a1e`. Next open: `EMEA-C2-TEST`.*
+*Last updated: 2026-07-17 — baseline `355c91b33fb0fa18907e972a3c632fcd51aff1f4`. `EMEA-TRAVEL` DONE + n8n validated (Fulchester `4434499750`). Output-field normalization remains OPEN (`EMEA-OUTPUT-NORM`). Next open: `EMEA-C2-TEST`.*
