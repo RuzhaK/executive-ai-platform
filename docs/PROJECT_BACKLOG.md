@@ -265,7 +265,8 @@ Extract → Closed → Country-list → Domain → Language → Founder → AI -
 |--------|-----|------|
 | OPEN | **EMEA-OUTPUT-NORM** | Output-field normalization (runtime/sheet display vs internal gate fields) — governs field consistency **after** a decision is produced (deterministic or AI). **Independent of** CleverMatch repeatability (`4432338590`); related investigation only |
 | DONE | **EMEA-REGRESSION-FRAMEWORK** | Lightweight 7-phase lifecycle + Regression Catalog — seed `EMEA-TRAVEL-A` only; add cases incrementally after explicit n8n validation |
-| OPEN | **DOC-ARCH** | Reconcile `docs/architecture/WORKFLOW_ARCHITECTURE.md` with post-C2 topology (46 nodes) |
+| OPEN | **DOC-ARCH-REFRESH** | Refresh architecture docs: `WORKFLOW_ARCHITECTURE.md` must accurately reflect current EMEA v1.1 workflow (`Executive-Job-CRM-v1.1-DEV.json`, 51 nodes); `V1.1_ARCHITECTURE.md` clearly positioned as historical target design or updated appropriately. Audit 2026-07-17: WORKFLOW header/topology **partially stale** (documents 17-node path); V1.1 gap analysis **historical** vs as-built. Do not commit stale architecture as canonical without qualification or update. |
+| SUPERSEDED | **DOC-ARCH** | Reconcile `WORKFLOW_ARCHITECTURE.md` with post-C2 topology (46 nodes) — superseded by **DOC-ARCH-REFRESH** |
 | OPEN | **DOC-SHEET** | Fix `Company = System.Xml.XmlElement` append mapping noted in v13 export |
 
 ---
@@ -405,4 +406,4 @@ Controlled case for **Verified/score/enrichment repeatability** — not a travel
 
 ---
 
-*Last updated: 2026-07-17 — baseline `355c91b33fb0fa18907e972a3c632fcd51aff1f4`. `EMEA-REGRESSION-FRAMEWORK` DONE (lifecycle + catalog; seed `EMEA-TRAVEL-A`). `EMEA-OUTPUT-NORM` OPEN. CleverMatch repeatability OPEN (separate). Next open: `EMEA-C2-TEST`.*
+*Last updated: 2026-07-17 — baseline `355c91b33fb0fa18907e972a3c632fcd51aff1f4`. `DOC-ARCH-REFRESH` OPEN (architecture audit complete; no doc update yet). Next: `EMEA-OUTPUT-NORM`.*
