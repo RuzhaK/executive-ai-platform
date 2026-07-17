@@ -8,10 +8,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1472,
-        192
+        -4640,
+        288
       ],
-      "id": "32aa7a45-4a9b-4f57-a197-0253fd03bdf9",
+      "id": "f0a54814-2be3-41e5-9f43-c4927f7f41b5",
       "name": "Parse Job Cards"
     },
     {
@@ -21,10 +21,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1696,
-        192
+        -4416,
+        288
       ],
-      "id": "75c85474-7a77-4627-87c4-deb88b6ec80f",
+      "id": "18bc3686-598e-4877-9ba1-e349cc1fa469",
       "name": "DEV - Cap Max Job Cards",
       "notesInFlow": true,
       "notes": "DEV ONLY — applies MaxJobCards from DEV Config when TestMode=true.\nPass-through when TestMode=false (production).\nSet MaxJobCards in DEV Config (default 1). Scale: 1 → 10 → 50."
@@ -36,10 +36,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1920,
-        192
+        -4192,
+        288
       ],
-      "id": "dea27109-397e-456c-85d8-31f74c8ccad4",
+      "id": "be78883c-534f-45a1-ba7d-6bfb9f8421da",
       "name": "DEV - Inject Low Preview Test Job"
     },
     {
@@ -50,10 +50,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        2592,
-        288
+        -3520,
+        384
       ],
-      "id": "2fd6841a-a5c0-497a-9c36-90f028556676",
+      "id": "3e26b674-92bc-4e4c-bdf4-da1b58906c4f",
       "name": "Policy Engine"
     },
     {
@@ -85,10 +85,10 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
       "position": [
-        2816,
-        288
+        -3296,
+        384
       ],
-      "id": "a82589e8-fabb-44f2-9fde-6ad7234bf051",
+      "id": "1708ce44-04ae-449a-a8b7-b0ee29d80300",
       "name": "Check Language in Title"
     },
     {
@@ -99,10 +99,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        6112,
-        480
+        0,
+        576
       ],
-      "id": "c044db73-29a2-4fad-bb04-dfd424fb23eb",
+      "id": "a70bd19a-f7de-44f2-91c5-123b29f8d7ab",
       "name": "Build Language Title Reject Record"
     },
     {
@@ -134,10 +134,10 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
       "position": [
-        5432,
-        0
+        -688,
+        96
       ],
-      "id": "f37b9471-2c92-4102-869e-8f2909e37637",
+      "id": "73f886aa-657e-4908-898f-89252c7d2f63",
       "name": "Check Mandatory Domain"
     },
     {
@@ -148,10 +148,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        6336,
-        96
+        224,
+        192
       ],
-      "id": "235f6524-c5fa-4eda-a296-ae5954e5d086",
+      "id": "9ae5394d-0076-45c6-b37d-25971256f1a3",
       "name": "Build Mandatory Domain Reject Record"
     },
     {
@@ -178,10 +178,10 @@
       "type": "@n8n/n8n-nodes-langchain.openAi",
       "typeVersion": 2.3,
       "position": [
-        3040,
-        288
+        -3072,
+        384
       ],
-      "id": "6f304764-6bd6-491c-b3ab-4df94fcd7c24",
+      "id": "428c0001-5d8e-4041-a513-458636b16940",
       "name": "AI - Preview Score Job",
       "credentials": {
         "openAiApi": {
@@ -198,10 +198,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        3168,
-        288
+        -2944,
+        384
       ],
-      "id": "dca7604a-dea9-4497-9bfb-667d6c7ff70d",
+      "id": "d23b8303-d32a-4aa2-9e24-06da4bf1db76",
       "name": "Preview Score Job"
     },
     {
@@ -233,10 +233,10 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
       "position": [
-        3392,
-        288
+        -2720,
+        384
       ],
-      "id": "93bf0716-78c6-4fb1-a15d-84f0794a4759",
+      "id": "69367d61-a5aa-4e51-b9c8-38e8a79320c0",
       "name": "Check Preview Threshold"
     },
     {
@@ -247,10 +247,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        6112,
-        624
+        0,
+        720
       ],
-      "id": "f3d75391-ddb0-4965-812c-fbf9a30c76a4",
+      "id": "d6a6e90a-3025-4c0b-9cc6-c4a31237eaf6",
       "name": "Build Preview Reject Record"
     },
     {
@@ -271,10 +271,10 @@
       "type": "n8n-nodes-base.gmailTrigger",
       "typeVersion": 1.4,
       "position": [
-        -896,
-        192
+        -7008,
+        288
       ],
-      "id": "fd6e5057-162f-4b64-a243-cfffbc4ca0a8",
+      "id": "9629e7f8-e7ca-431d-bcd7-4ad7364d028c",
       "name": "Gmail - Job Alerts Trigger",
       "credentials": {
         "gmailOAuth2": {
@@ -296,7 +296,7 @@
             {
               "id": "dev-gmail-test-email-id",
               "name": "TestEmailId",
-              "value": "19f2992fca6a623c",
+              "value": "19f276e33f1c2e9d",
               "type": "string"
             },
             {
@@ -378,10 +378,10 @@
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
       "position": [
-        -672,
-        192
+        -6784,
+        288
       ],
-      "id": "541be9b7-7024-47ea-8dc3-d94b46dbb5d9",
+      "id": "5d658dc7-8466-4211-987f-8cf7a32827ed",
       "name": "DEV Config - Gmail Input Selection",
       "notesInFlow": true,
       "notes": "DEV ONLY — Gmail input selection\n\nDefault regression configuration (editable at runtime):\n  TestMode = true\n  TestLabel = jobs-exec-crm-regression\n  FetchMode = search\n  TestMaxResults = 10 (Gmail messages fetched)\n  MaxJobCards = 1 (job cards processed after Parse Job Cards)\n  Limit / TestResult = documentation fields (not wired to fetch)\n  TestEmailId = empty\n  TestSubjectContains = empty\n\nRegression scale (independent limits):\n  TestMaxResults: 1 → 10 → 50 (emails)\n  MaxJobCards: 1 → 10 → 50 (extracted job cards)\n\nPriority when TestMode=true:\n1. TestEmailId → exact message (limit 1)\n2. TestLabel → Gmail search by label (ignores TestReceivedAfter/Before)\n3. Else → date/subject search + Jobs/LinkedIn label\n\nExpected Gmail query: label:jobs-exec-crm-regression\n\nProduction override: TestMode=false (label Jobs/LinkedIn, limit 1; MaxJobCards ignored)\n\nLinkedIn HTTP throttling (Phase 2 enrichment):\n  HttpDelayMs = 2000–5000 (default 3000)\n  MaxConcurrentHttpRequests = 1"
@@ -393,10 +393,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -448,
-        192
+        -6560,
+        288
       ],
-      "id": "e43faafe-3f62-4b07-8bd5-aa8c85699178",
+      "id": "61595809-a294-4ba4-8ba7-9cbc48199ece",
       "name": "Build Gmail Fetch Plan"
     },
     {
@@ -482,10 +482,10 @@
       "type": "n8n-nodes-base.switch",
       "typeVersion": 3.2,
       "position": [
-        -224,
-        176
+        -6336,
+        272
       ],
-      "id": "ae564ccf-8ddf-4f07-96d9-eb2ad75be751",
+      "id": "438a620b-1d4c-4f54-8782-83605c4c8524",
       "name": "Switch Gmail Fetch Mode"
     },
     {
@@ -501,10 +501,10 @@
       "type": "n8n-nodes-base.gmail",
       "typeVersion": 2.2,
       "position": [
-        0,
-        0
+        -6112,
+        96
       ],
-      "id": "e8042c1d-bf16-4005-a413-d8c9f550ebfe",
+      "id": "d3363fd3-a299-4539-9792-3f5c988240b4",
       "name": "Gmail - Read Job Alert Emails",
       "webhookId": "2bb4c29f-3eb2-482f-8b45-f89c8a89d70e",
       "credentials": {
@@ -524,10 +524,10 @@
       "type": "n8n-nodes-base.gmail",
       "typeVersion": 2.2,
       "position": [
-        0,
-        192
+        -6112,
+        288
       ],
-      "id": "ad68640e-5efd-4d09-819b-093f2dadf8a3",
+      "id": "c90b4529-c691-44f6-81f0-cd9dd97804ee",
       "name": "Gmail - Get Email By ID (DEV)",
       "webhookId": "ce3dddf8-b68f-4b75-9125-d320370884eb",
       "credentials": {
@@ -551,10 +551,10 @@
       "type": "n8n-nodes-base.gmail",
       "typeVersion": 2.2,
       "position": [
-        0,
-        384
+        -6112,
+        480
       ],
-      "id": "8d4f7c75-915b-45d0-9cb7-c0b6cfb0f10b",
+      "id": "bef8eb7c-c1ab-48c9-87bf-e13c642b9929",
       "name": "Gmail - Search Emails (DEV)",
       "webhookId": "b5a7332e-6169-4fef-9a7c-ae1866d80aa7",
       "credentials": {
@@ -572,10 +572,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        224,
-        192
+        -5888,
+        288
       ],
-      "id": "65bc9a81-5891-4050-b751-18ea13577627",
+      "id": "a30184b4-1bc8-4f16-bef5-13710ae1e89f",
       "name": "Normalize Email Metadata"
     },
     {
@@ -588,10 +588,10 @@
       "type": "n8n-nodes-base.gmail",
       "typeVersion": 2.2,
       "position": [
-        448,
-        192
+        -5664,
+        288
       ],
-      "id": "9db07ca6-217f-43f6-b7d5-05d539a2952d",
+      "id": "c9ac5e53-f7bc-4730-b087-99ca15dd1929",
       "name": "Extract Email Body",
       "webhookId": "043f83cd-7074-4d5b-9c32-fb631556bd0d",
       "credentials": {
@@ -609,10 +609,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        672,
-        192
+        -5440,
+        288
       ],
-      "id": "a573a544-cb10-4d50-a08d-e5e8b6cd1965",
+      "id": "3c1fc479-a9c1-4360-9e7e-0b4ad00ebc0c",
       "name": "Normalize Email Content"
     },
     {
@@ -636,10 +636,10 @@
       "type": "@n8n/n8n-nodes-langchain.openAi",
       "typeVersion": 2.3,
       "position": [
-        1120,
-        192
+        -4992,
+        288
       ],
-      "id": "9e47a026-6e7f-49d1-89dc-2f00847e3257",
+      "id": "b6c6bcb4-01f9-4509-97c5-eab869bae5ad",
       "name": "AI - Extract Job Cards",
       "credentials": {
         "openAiApi": {
@@ -676,10 +676,10 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
       "position": [
-        3616,
-        224
+        -2496,
+        320
       ],
-      "id": "35f68599-e046-4964-9a93-d94f480414b3",
+      "id": "977b327a-4611-4bd3-9419-7c7387cd554d",
       "name": "Check Location Eligibility"
     },
     {
@@ -705,10 +705,10 @@
       "type": "@n8n/n8n-nodes-langchain.openAi",
       "typeVersion": 2.3,
       "position": [
-        4064,
-        96
+        -2048,
+        192
       ],
-      "id": "f2b59125-8f0c-4f41-b366-007b6bbb3bc7",
+      "id": "a2590cea-4471-44aa-a3ff-66e3d1f23951",
       "name": "AI - Initial Job Evaluation",
       "credentials": {
         "openAiApi": {
@@ -725,10 +725,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        4416,
-        96
+        -1696,
+        192
       ],
-      "id": "d86ad0aa-006d-4f69-9115-4f791db396d9",
+      "id": "91a9a4db-15ee-4fb1-9a2d-b78a0357cce3",
       "name": "Normalize AI Evaluation"
     },
     {
@@ -755,10 +755,10 @@
       "type": "@n8n/n8n-nodes-langchain.openAi",
       "typeVersion": 2.3,
       "position": [
-        5312,
-        0
+        -800,
+        96
       ],
-      "id": "298e6946-2b83-441b-8088-bb3b7c298a58",
+      "id": "fd00983b-3355-4aa4-843e-61aa9b61cb2a",
       "name": "AI - Verified Review",
       "credentials": {
         "openAiApi": {
@@ -775,10 +775,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        4128,
-        464
+        -1984,
+        560
       ],
-      "id": "ae031baa-ceef-4415-a925-bb9fe5e294ba",
+      "id": "3eceb24a-e7d8-4284-84a5-71f8c1485272",
       "name": "Build Reject Record"
     },
     {
@@ -786,11 +786,24 @@
       "type": "n8n-nodes-base.merge",
       "typeVersion": 3.2,
       "position": [
-        6336,
-        288
+        224,
+        384
       ],
-      "id": "d9622f90-db42-4923-9b4c-b87f7da1ebf1",
+      "id": "de793af0-91df-40f0-8180-ed43880c55c3",
       "name": "Merge Final Records"
+    },
+    {
+      "parameters": {
+        "jsCode": "// EMEA-OUTPUT-NORM: output contract only — never mutate routing fields\nconst EMPTY='';\nconst isFiniteNumber=(v)=>{const s=String(v??'').trim();if(s==='')return false;const n=Number(s);return Number.isFinite(n);};\nconst asTrimmed=(v)=>String(v??'').trim();\nconst normalizeFinalDecision=(value)=>{const v=asTrimmed(value).toUpperCase();if(v==='APPLY IF INTERESTED'||v==='APPLY_IF_INTERESTED')return'MONITOR';if(v==='APPLY NOW'||v==='APPLY_NOW'||v==='APPLY')return'APPLY NOW';if(v==='MONITOR')return'MONITOR';if(v==='REJECT')return'REJECT';if(v==='REJECT_PREVIEW')return'REJECT_PREVIEW';return asTrimmed(value)||EMPTY;};\nconst resolveLocationFit=(item,stage,autoReason,status)=>{if(stage==='POLICY_REJECT'&&autoReason==='LANGUAGE')return EMPTY;if(stage==='PREVIEW_REJECT')return EMPTY;if(stage==='FINAL_REJECT'&&['MANDATORY_TRAVEL','MANDATORY_DOMAIN','CLOSED_POSTING'].includes(autoReason))return EMPTY;if(stage==='POLICY_REJECT'&&status==='Location Rejected')return asTrimmed(item.LocationFit)||'MISMATCH';return asTrimmed(item.LocationFit);};\nconst isPreVerifiedTerminal=(s)=>{const stage=asTrimmed(s.PipelineStage);const auto=asTrimmed(s.auto_reject_reason);if(stage==='POLICY_REJECT'&&auto==='LANGUAGE')return true;if(stage==='PREVIEW_REJECT'||stage==='NO_JOB_CARD')return true;if(stage==='FINAL_REJECT'&&['MANDATORY_TRAVEL','MANDATORY_DOMAIN','CLOSED_POSTING'].includes(auto))return true;if(stage==='POLICY_REJECT'&&asTrimmed(s.Status)==='Location Rejected')return true;return false;};\nconst blankVerifiedFields=()=>({VerifiedScore:EMPTY,VerifiedRecommendation:EMPTY,FinalCV:EMPTY,VerifiedRisk:EMPTY,VerifiedWhyApply:EMPTY,VerifiedPriority:EMPTY,SalaryEstimate:EMPTY,SalaryRange:EMPTY,SalaryConfidence:EMPTY,SalaryAssumption:EMPTY});\nreturn $input.all().map((item)=>{const src=item.json;const stage=asTrimmed(src.PipelineStage);const autoReason=asTrimmed(src.auto_reject_reason);const status=asTrimmed(src.Status);const initialEvalRan=isFiniteNumber(src.InitialEvalScore);const previewRan=isFiniteNumber(src.PreviewScore)&&asTrimmed(src.PreviewRecommendation)!=='';const hasNumericVerifiedScore=isFiniteNumber(src.VerifiedScore);const verifiedRec=asTrimmed(src.VerifiedRecommendation).toUpperCase();const hasVerifiedRec=['YES','MONITOR','NO'].includes(verifiedRec);const verifiedRan=hasNumericVerifiedScore&&hasVerifiedRec&&!isPreVerifiedTerminal(src);const out={...src,FinalDecision:normalizeFinalDecision(src.FinalDecision),LocationFit:resolveLocationFit(src,stage,autoReason,status),InterviewProbability:initialEvalRan?src.InterviewProbability:EMPTY,OutputVerifiedRan:verifiedRan,OutputInitialEvalRan:initialEvalRan,OutputPreviewRan:previewRan};if(verifiedRan){out.VerifiedScore=Number(src.VerifiedScore);out.VerifiedRecommendation=verifiedRec;}else{Object.assign(out,blankVerifiedFields());}if(verifiedRan){out.OutputScore=out.VerifiedScore;out.OutputRecommendation=out.VerifiedRecommendation;out.OutputRecommendedCV=asTrimmed(out.FinalCV);}else if(previewRan){out.OutputScore=Number(src.PreviewScore);out.OutputRecommendation=asTrimmed(src.PreviewRecommendation);out.OutputRecommendedCV=asTrimmed(src.PreviewCV);}else{out.OutputScore=EMPTY;out.OutputRecommendation=EMPTY;out.OutputRecommendedCV=EMPTY;}if(verifiedRan&&asTrimmed(out.VerifiedRisk)){out.OutputNotes=asTrimmed(out.VerifiedRisk);}else if(asTrimmed(src.MainRisk)){out.OutputNotes=asTrimmed(src.MainRisk);}else if(asTrimmed(src.PreviewReason)){out.OutputNotes=asTrimmed(src.PreviewReason);}else if(asTrimmed(src.PreviewRisk)){out.OutputNotes=asTrimmed(src.PreviewRisk);}else{out.OutputNotes=EMPTY;}return{json:out,pairedItem:item.pairedItem};});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        352,
+        384
+      ],
+      "id": "1f0ad2eb-40d0-4d13-a17b-29825cc63f38",
+      "name": "Normalize Output Record"
     },
     {
       "parameters": {
@@ -814,22 +827,22 @@
           "value": {
             "Date": "={{ $now }}",
             "Source": "={{ $json.Source }}",
-            "Notes": "={{ String($json.VerifiedRisk) !== '' ? $json.VerifiedRisk : ($json.MainRisk || $json.PreviewReason || $json.PreviewRisk || '') }}",
+            "Notes": "={{ $json.OutputNotes }}",
             "Status": "={{ $json.Status }}",
-            "Company": "= {{ $json.Company }}",
+            "Company": "={{ $json.Company }}",
             "Role": "={{ $json.Role }}",
             "Location": "={{$json.Location}}",
             "URL": "={{ $json.URL }}",
             "Remote": "={{ $json.RemoteFit }}",
-            "Score": "={{ String($json.VerifiedScore) !== '' ? $json.VerifiedScore : $json.PreviewScore }}",
+            "Score": "={{ $json.OutputScore }}",
             "Interview Probability": "={{$json.InterviewProbability}}",
-            "Recommended CV": "={{ String($json.FinalCV) !== '' ? $json.FinalCV : $json.PreviewCV }}",
-            "Recommendation": "={{ String($json.VerifiedRecommendation) !== '' ? $json.VerifiedRecommendation : $json.PreviewRecommendation }}",
+            "Recommended CV": "={{ $json.OutputRecommendedCV }}",
+            "Recommendation": "={{ $json.OutputRecommendation }}",
             "Country Fit": "={{$json.CountryFit}}",
             "Seniority Fit": "={{$json.SeniorityFit}}",
-            "Sector Fit": "= {{$json.SectorFit}}",
-            "Priority": "= {{$json.Priority}}",
-            "Why Apply": "= {{$json.WhyApply}}",
+            "Sector Fit": "={{$json.SectorFit}}",
+            "Priority": "={{$json.Priority}}",
+            "Why Apply": "={{$json.WhyApply}}",
             "Verified Score": "={{$json.VerifiedScore}}",
             "Verified Recommendation": "={{$json.VerifiedRecommendation}}",
             "Final CV": "={{$json.FinalCV}}",
@@ -1436,10 +1449,10 @@
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.7,
       "position": [
-        7008,
-        288
+        896,
+        384
       ],
-      "id": "be1b11fe-2e12-487e-80bd-75660052d526",
+      "id": "17d8648c-be18-46b7-9f7d-82121b856472",
       "name": "Append to Google Sheets",
       "retryOnFail": true,
       "waitBetweenTries": 3000,
@@ -1457,10 +1470,10 @@
       "type": "n8n-nodes-base.wait",
       "typeVersion": 1.1,
       "position": [
-        7232,
-        288
+        1120,
+        384
       ],
-      "id": "23f932c7-838f-47c5-bed2-5b0f9826c6b2",
+      "id": "beb707da-e6f6-4b85-ae46-88803e0b6d6b",
       "name": "Execution Delay",
       "webhookId": "754e3b1e-cd96-405c-aeca-4ebd2ca9e774"
     },
@@ -1502,10 +1515,10 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
       "position": [
-        3840,
-        144
+        -2272,
+        240
       ],
-      "id": "d58f9a24-3961-4630-88f0-9c703e83230b",
+      "id": "73a3e197-9dcb-4ac0-8ba2-7775c165ee5f",
       "name": "Validate Parsed Jobs"
     },
     {
@@ -1516,10 +1529,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        5664,
-        0
+        -448,
+        96
       ],
-      "id": "13f40616-62f9-443b-8cec-76493c27fdc2",
+      "id": "0708d3ed-7573-49e6-8f2f-9518d144ed1a",
       "name": "Normalize Verified Review"
     },
     {
@@ -1550,10 +1563,10 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
       "position": [
-        5888,
-        0
+        -224,
+        96
       ],
-      "id": "e2edcd6d-2f23-4543-92ec-0c72ff2bcc41",
+      "id": "3b2135ed-2d9b-46c0-833d-6f95f312c5d4",
       "name": "Check Verified Score Threshold"
     },
     {
@@ -1564,10 +1577,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        6112,
-        80
+        0,
+        176
       ],
-      "id": "c2767f26-910d-4da2-903e-a4a2365445a4",
+      "id": "608705b1-79bd-4517-8225-cfe3436b9e36",
       "name": "Build Verified Score Reject Record"
     },
     {
@@ -1577,10 +1590,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        896,
-        192
+        -5216,
+        288
       ],
-      "id": "023c639d-faf0-4f86-bb7f-caffd0f1c830",
+      "id": "a30a0bd8-e189-4bc5-926b-2ec8382d6605",
       "name": "Filter Skip Digest Emails"
     },
     {
@@ -1590,10 +1603,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        6784,
-        288
+        672,
+        384
       ],
-      "id": "76c01009-a760-423e-be9b-e6a588ecc644",
+      "id": "03d1be6c-0e11-4f34-a294-e1eb18c8a73f",
       "name": "Gate Append to CRM Sheet"
     },
     {
@@ -1603,10 +1616,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        6560,
-        288
+        448,
+        384
       ],
-      "id": "14fb6988-ce03-490a-b8b1-3248b2e3dd6c",
+      "id": "98b5221e-9375-4ac5-8e72-6abfbc1d10ae",
       "name": "Regression Assert - Score Path"
     },
     {
@@ -1616,10 +1629,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        2144,
-        192
+        -3968,
+        288
       ],
-      "id": "46d7c987-0277-47a3-9be9-dee274510c21",
+      "id": "377c06e6-7ad7-42af-bb09-b8815903525c",
       "name": "DEV - Inject Score Path Regression Case"
     },
     {
@@ -1651,10 +1664,10 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
       "position": [
-        2368,
-        192
+        -3744,
+        288
       ],
-      "id": "b6bfba94-6eee-46ea-a6b4-574f7cfd208f",
+      "id": "e39c4c69-40a7-4ccf-9efd-c004f30c5c09",
       "name": "Check Job Cards Extracted"
     },
     {
@@ -1665,10 +1678,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        2592,
-        96
+        -3520,
+        192
       ],
-      "id": "0b926e94-faf2-4feb-b77f-ef788db9bad6",
+      "id": "84b877f9-3dca-48a9-92d1-f9ff2dcb4d65",
       "name": "Build No Job Card Record"
     },
     {
@@ -1700,10 +1713,10 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
       "position": [
-        4640,
-        96
+        -1472,
+        192
       ],
-      "id": "82ed4bfa-4f0d-4d81-bdee-ba57415fd85f",
+      "id": "5b0b1304-5688-414c-81f7-354b5a822cc5",
       "name": "Check Job URL Valid"
     },
     {
@@ -1735,10 +1748,10 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.4,
       "position": [
-        4864,
-        0
+        -1248,
+        96
       ],
-      "id": "a537b2d0-9f26-4422-89c1-d383fe9491e9",
+      "id": "3a13bbf1-8572-4225-ba93-75b1621b8156",
       "name": "HTTP Request",
       "notesInFlow": true,
       "notes": "LinkedIn guest API fetch. Sequential throttling via batching (batchSize=1, batchInterval from DEV Config HttpDelayMs 2000-5000 ms)."
@@ -1751,10 +1764,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        5088,
-        0
+        -1024,
+        96
       ],
-      "id": "5ebf32f6-236a-4212-80bc-d888e493cb0c",
+      "id": "747f44c0-e7fb-4045-90b0-23895cc9be65",
       "name": "Extract LinkedIn Job Description"
     },
     {
@@ -1786,10 +1799,10 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
       "position": [
-        5200,
-        0
+        -912,
+        96
       ],
-      "id": "1365fc32-dd4b-4f76-bd45-226ccb86e8a8",
+      "id": "47a3ef50-e94a-43fb-8ee5-f3ac581fe3f4",
       "name": "Check Posting Closed"
     },
     {
@@ -1800,10 +1813,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        6112,
-        -96
+        0,
+        0
       ],
-      "id": "4c36d005-7136-4a3f-a39c-035cc82be136",
+      "id": "af8160b9-9514-4f14-a8b0-848e940c4784",
       "name": "Build Closed Posting Reject Record"
     },
     {
@@ -1814,10 +1827,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        5256,
-        128
+        -864,
+        224
       ],
-      "id": "f8a91c2e-4d5b-4e6a-9c1f-7e3a8b2d4c6e",
+      "id": "2263ed41-ceb7-4198-a474-dbf74ecf7670",
       "name": "Mandatory Travel Gate"
     },
     {
@@ -1849,10 +1862,10 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
       "position": [
-        5376,
-        128
+        -736,
+        224
       ],
-      "id": "a2b3c4d5-e6f7-4890-a123-b4c5d6e7f890",
+      "id": "7131c329-6375-4331-8501-f9121ab3ba7f",
       "name": "Check Mandatory Travel"
     },
     {
@@ -1863,10 +1876,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        6112,
-        128
+        0,
+        224
       ],
-      "id": "b3c4d5e6-f7a8-4901-b234-c5d6e7f89012",
+      "id": "7331e514-01b1-49f0-bd9e-dcb0912264a9",
       "name": "Build Mandatory Travel Reject Record"
     },
     {
@@ -1877,10 +1890,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        5312,
-        0
+        -800,
+        96
       ],
-      "id": "e09f3f94-fb86-4185-80a5-2e82f889530a",
+      "id": "1227e40a-2d5a-4081-8cab-d19960b6d99e",
       "name": "Mandatory Domain Gate"
     },
     {
@@ -1891,10 +1904,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        6112,
-        272
+        0,
+        368
       ],
-      "id": "ea8e479e-0205-47ec-8601-d46b4ec0c17d",
+      "id": "c5210b0b-c2e3-4eb1-b196-60ca1ae2ee2c",
       "name": "Build No URL Preview Only Record"
     }
   ],
@@ -2382,6 +2395,17 @@
       "main": [
         [
           {
+            "node": "Normalize Output Record",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Output Record": {
+      "main": [
+        [
+          {
             "node": "Regression Assert - Score Path",
             "type": "main",
             "index": 0
@@ -2577,11 +2601,11 @@
     "executionOrder": "v1",
     "binaryMode": "separate"
   },
-  "versionId": "ecc28910-7430-46bf-b071-4632582d3aa9",
+  "versionId": "af1b67dd-af18-4c41-8fc9-d1ce68aaab95",
   "meta": {
     "instanceId": "b9354026cec4ec7c920288107d54e259bdbb33dcd0d36ad90ab94b019850fec2"
   },
   "nodeGroups": [],
-  "id": "F2hjydM133srfpWu",
+  "id": "PDZ97fWyccygIZbB",
   "tags": []
 }
