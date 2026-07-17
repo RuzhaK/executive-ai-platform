@@ -127,6 +127,38 @@ Under `Executive Opportunity Intelligence Platform/backups/EMEA BACKUPs/`:
 | **Fix shipped** | Option A — scan full `FullJobText` before period-split chunks (`355c91b`) |
 | **Out of scope** | Output-field normalization (separate future backlog item) |
 
+### Provisional conclusion — CleverMatch REJECT→ACCEPT (post EMEA-TRAVEL; not a travel-gate regression)
+
+| Field | Value |
+|-------|--------|
+| **Status** | **Provisional — accepted; exact prior cause unconfirmed** |
+| **Company** | CleverMatch |
+| **Role** | Geschäftsführer / Unternehmer / Nachfolger für den Mittelstand (m/w/d) |
+| **JobId** | `4432338590` |
+| **Observed** | Previously **REJECT** (commit `570c097` run); later **ACCEPT** (commit `355c91b` run) |
+| **Option A (`355c91b`) is not the cause** | On current guest `FullJobText` (2031 chars, `EnrichmentStatus=OK`), mandatory travel gate is **`blocked=false` at both `570c097` and `355c91b`** — no `%`, no English travel context, no German travel/mobility terms. Option A cannot flip travel-gate REJECT→ACCEPT on identical text. |
+| **Exact cause** | **Unconfirmed** — previous n8n execution output unavailable in repo/backups. |
+| **Most likely causes** | (1) **Verified AI variability** and/or **verified score-threshold outcome**; (2) **different enrichment input** (`FullJobText` / `FullJobTextLength`) between runs. |
+| **Mandatory Travel fix** | **Do not revert** — Fulchester `4434499750` validated at `355c91b`. |
+| **Historical row search** | **No row found** — see [Historical row search](#historical-row-search-clevermatch-4432338590) below. Prior REJECT observation **cannot be reconstructed** from available exports. |
+| **Next step** | CleverMatch added as **controlled repeatability regression case** (next test run). **Separate from EMEA-OUTPUT-NORM** — see [Repeatability — CleverMatch](#repeatability--clevermatch-open-next-test-run). |
+
+#### Historical row search — CleverMatch `4432338590`
+
+Searched 2026-07-17 (prior REJECT reconstruction attempt):
+
+| Source | Scope | Result |
+|--------|--------|--------|
+| `executive-ai-platform` repo | all tracked files | **No row** |
+| `Executive Opportunity Intelligence Platform/backups/EMEA BACKUPs/` | 40 workflow JSON snapshots | **No row** (workflow exports only; no sheet/execution data) |
+| `Executive Opportunity Intelligence Platform/backups/BG VERSION BACKUPS/` | BG snapshots | **No row** |
+| `workflows/_forensic_*.txt` | forensic artifacts | **No row** |
+| Agent transcript / `agent-tools` | conversation + tool outputs | JobId mentioned; **no execution field values** |
+| Excel (`.xlsx`) / CSV regression exports | under `CV/GitHub` tree | **No `.xlsx`/`.csv` files found** in searchable workspace paths |
+| n8n execution exports | `*execution*` filename pattern | **None found** |
+
+**Fields sought (not recovered):** timestamp, `FinalDecision`, `PipelineStage`, `RejectReason`, `auto_reject_reason`, `VerifiedScore`, `VerifiedRecommendation`, `FullJobTextLength`, `EnrichmentStatus`.
+
 ---
 
 ## Completed Work
@@ -231,7 +263,7 @@ Extract → Closed → Country-list → Domain → Language → Founder → AI -
 
 | Status | ID | Item |
 |--------|-----|------|
-| OPEN | **EMEA-OUTPUT-NORM** | Output-field normalization (runtime/sheet display vs internal gate fields) — **not part of EMEA-TRAVEL** |
+| OPEN | **EMEA-OUTPUT-NORM** | Output-field normalization (runtime/sheet display vs internal gate fields) — governs field consistency **after** a decision is produced (deterministic or AI). **Independent of** CleverMatch repeatability (`4432338590`); related investigation only |
 | OPEN | **DOC-ARCH** | Reconcile `docs/architecture/WORKFLOW_ARCHITECTURE.md` with post-C2 topology (46 nodes) |
 | OPEN | **DOC-SHEET** | Fix `Company = System.Xml.XmlElement` append mapping noted in v13 export |
 
@@ -302,6 +334,20 @@ When `EnrichmentStatus` is not `OK` or `FullJobTextLength < 200`, deterministic 
 | **J. Enrichment fail-open** | `EnrichmentStatus != OK` | `MandatoryTravelBlocked = false` |
 | **K. C6 / C2 integrity** | Closed stub / Mill domain | Unchanged when travel gate does not fire |
 
+### Repeatability — CleverMatch (OPEN; next test run)
+
+Controlled case for **Verified/score/enrichment repeatability** — not a travel-gate negative control. **Related but separate from EMEA-OUTPUT-NORM:** repeatability tests whether AI/score outcomes are stable; output normalization tests whether emitted fields consistently reflect whatever decision was produced.
+
+| Field | Value |
+|-------|--------|
+| **Company** | CleverMatch |
+| **JobId** | `4432338590` |
+| **Baseline commit** | `355c91b33fb0fa18907e972a3c632fcd51aff1f4` |
+| **Purpose** | Run **twice** on same regression batch; capture full execution JSON + sheet row both times. Confirm whether outcome is stable and record all fields in [Historical row search](#historical-row-search-clevermatch-4432338590) table. |
+| **Deterministic gate expectation** | `MandatoryTravelBlocked=false`, `MandatoryDomainBlocked=false`, `PostingClosedConfirmed=false` when `EnrichmentStatus=OK` and `FullJobTextLength≈2031` |
+| **Fields to capture per run** | timestamp, last node, `FinalDecision`, `PipelineStage`, `RejectReason`, `auto_reject_reason`, `MandatoryTravelBlocked`, `MandatoryTravelPercentMax`, `MandatoryTravelRejectReason`, `MandatoryDomainBlocked`, `MandatoryDomainRejectReason`, `VerifiedScore`, `VerifiedRecommendation`, `FullJobTextLength`, `EnrichmentStatus`, `FullJobText` hash or export |
+| **Status** | **OPEN — scheduled for next Limit = 1 regression run** |
+
 ### Protected paths (must not regress)
 
 | Path | Rule |
@@ -326,4 +372,4 @@ When `EnrichmentStatus` is not `OK` or `FullJobTextLength < 200`, deterministic 
 
 ---
 
-*Last updated: 2026-07-17 — baseline `355c91b33fb0fa18907e972a3c632fcd51aff1f4`. `EMEA-TRAVEL` DONE + n8n validated (Fulchester `4434499750`). Output-field normalization remains OPEN (`EMEA-OUTPUT-NORM`). Next open: `EMEA-C2-TEST`.*
+*Last updated: 2026-07-17 — baseline `355c91b33fb0fa18907e972a3c632fcd51aff1f4`. `EMEA-TRAVEL` DONE + n8n validated (Fulchester `4434499750`). CleverMatch `4432338590`: provisional conclusion recorded — Option A not cause; repeatability case OPEN (separate from `EMEA-OUTPUT-NORM`). `EMEA-OUTPUT-NORM` OPEN. Next open: `EMEA-C2-TEST`.*
