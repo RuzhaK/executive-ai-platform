@@ -264,8 +264,41 @@ Extract → Closed → Country-list → Domain → Language → Founder → AI -
 | Status | ID | Item |
 |--------|-----|------|
 | OPEN | **EMEA-OUTPUT-NORM** | Output-field normalization (runtime/sheet display vs internal gate fields) — governs field consistency **after** a decision is produced (deterministic or AI). **Independent of** CleverMatch repeatability (`4432338590`); related investigation only |
+| DONE | **EMEA-REGRESSION-FRAMEWORK** | Lightweight 7-phase lifecycle + Regression Catalog — seed `EMEA-TRAVEL-A` only; add cases incrementally after explicit n8n validation |
 | OPEN | **DOC-ARCH** | Reconcile `docs/architecture/WORKFLOW_ARCHITECTURE.md` with post-C2 topology (46 nodes) |
 | OPEN | **DOC-SHEET** | Fix `Company = System.Xml.XmlElement` append mapping noted in v13 export |
+
+---
+
+## EMEA Development Lifecycle (`EMEA-REGRESSION-FRAMEWORK`)
+
+Lightweight protocol for every EMEA backlog item. Goal: clear next step, fast validation — not extra bureaucracy.
+
+| Phase | Action | Exit |
+|-------|--------|------|
+| **1. Specification** | Backlog ID, scope, affected nodes, rollback sketch | Approved or clearly scoped |
+| **2. Regression design** | Name case ID(s); write expected outcomes **before** code | Case(s) listed in catalog as `OPEN` or in item notes |
+| **3. Implementation** | One workflow commit per backlog ID | Commit hash recorded |
+| **4. Deterministic regression** | Offline gate check (mirror Code node) when a deterministic gate exists | **PASS** · **N/A** for AI-only / prompt-only / routing-only items |
+| **5. n8n regression** | Import dev workflow; Limit **1 → 10 → 50** | Primary case(s) PASS |
+| **6. Documentation** | Docs commit after workflow validated | Backlog + catalog updated |
+| **7. DONE** | Close item | Status DONE; catalog case(s) `PASS` where applicable |
+
+**Catalog policy:** Seed with **validated cases only** (explicit n8n PASS). Add rows **incrementally** — do not catalogue every historical execution. Gate expected-behavior tables below remain design reference until a case earns a catalog row.
+
+**Existing repo rules still apply:** one backlog ID per workflow commit; docs commit after workflow commit; surgical JSON edits only (`docs/PROJECT_RULES.md`).
+
+---
+
+## Regression Catalog
+
+Stable, re-runnable cases with documented n8n validation. Not an execution archive.
+
+| Case ID | Backlog ID | Type | Input | Expected (summary) | Validated | Status |
+|---------|------------|------|-------|-------------------|-----------|--------|
+| **EMEA-TRAVEL-A** | EMEA-TRAVEL | POSITIVE | Fulchester Consultants / Managing Director / JobId `4434499750`; `EnrichmentStatus=OK`; `FullJobTextLength=3304`; travel *"as required (approx. 20–30%)"* | `FINAL_REJECT`; `PipelineStage=FINAL_REJECT`; `RejectReason: Mandatory travel above 20%: 20-30%`; `auto_reject_reason: MANDATORY_TRAVEL`; Verified does not run | `355c91b` · 2026-07-17 · Limit 1 (n8n) | **PASS** |
+
+*Additional cases (e.g. C2.1 Fulchester domain, C6 controls) — add only after explicit n8n regression validation.*
 
 ---
 
@@ -372,4 +405,4 @@ Controlled case for **Verified/score/enrichment repeatability** — not a travel
 
 ---
 
-*Last updated: 2026-07-17 — baseline `355c91b33fb0fa18907e972a3c632fcd51aff1f4`. `EMEA-TRAVEL` DONE + n8n validated (Fulchester `4434499750`). CleverMatch `4432338590`: provisional conclusion recorded — Option A not cause; repeatability case OPEN (separate from `EMEA-OUTPUT-NORM`). `EMEA-OUTPUT-NORM` OPEN. Next open: `EMEA-C2-TEST`.*
+*Last updated: 2026-07-17 — baseline `355c91b33fb0fa18907e972a3c632fcd51aff1f4`. `EMEA-REGRESSION-FRAMEWORK` DONE (lifecycle + catalog; seed `EMEA-TRAVEL-A`). `EMEA-OUTPUT-NORM` OPEN. CleverMatch repeatability OPEN (separate). Next open: `EMEA-C2-TEST`.*
