@@ -4,8 +4,28 @@ Executive Opportunity Intelligence Platform — EMEA dev pipeline (`emea-v1.1`).
 
 **Source of truth:** `workflows/Executive-Job-CRM-v1.1-DEV.json`  
 **Architecture reference:** `docs/architecture/WORKFLOW_ARCHITECTURE.md`  
-**Engineering rules:** `docs/PROJECT_RULES.md`  
-**BG portability items:** `docs/BG_PORTABILITY_BACKLOG.md`
+**Engineering rules:** `docs/PROJECT_RULES.md`
+
+## Repository and backlog rules
+
+- Use `docs/PROJECT_BACKLOG.md` as the single authoritative backlog.
+- Do not create additional backlog files unless explicitly approved.
+- Commit workflow implementation first.
+- Update and commit documentation only after the workflow commit exists and has been reviewed.
+- Do not add Co-authored-by trailers unless explicitly requested.
+- Do not use whole-file ConvertTo-Json on workflow JSON.
+- Use surgical JSON edits only.
+- Do not modify or commit unrelated files.
+- Every implementation must reference a backlog ID.
+- Implement one backlog item per workflow commit.
+- After each workflow commit, stop and provide:
+  - commit hash
+  - exact nodes changed
+  - exact connections changed
+  - node and connection counts
+  - rollback command
+  - regression checklist
+- Wait for approval before starting the next backlog item.
 
 ---
 
@@ -28,9 +48,9 @@ Use these statuses on every tracked item (commit, gate, or backlog ID):
 | Item | Value |
 |------|--------|
 | **Branch** | `emea-v1.1` |
-| **Commit** | `7ccdf7c5a96210adf14b18eac0b2986365383059` — `restore(emea): closed-posting gate before Verified` |
+| **Commit** | `570c097e669dd1bb9d3d72facd0be1fef8970a1e` — `feat(emea): mandatory travel gate before Verified` |
 | **Workflow file** | `workflows/Executive-Job-CRM-v1.1-DEV.json` |
-| **Nodes / connections** | 48 / 57 |
+| **Nodes / connections** | 51 / 61 |
 | **Regression label** | `jobs-exec-crm-regression` |
 | **DEV spreadsheet** | `Executive Job CRM - EMEA DEV` (`1x_f_DK5yi3FprfIo2w1Pf1Q9VaAeUeMm66gOnR7igJs`) |
 
@@ -42,14 +62,16 @@ Policy Engine → Check Language in Title
   FALSE → AI - Preview Score Job → …
 ```
 
-### Post-Extract pre-Verified chain (C2 + C6)
+### Post-Extract pre-Verified chain (C6 + TRAVEL + C2)
 
 ```
 Extract LinkedIn Job Description → Check Posting Closed
   TRUE  → Build Closed Posting Reject Record → Merge Final Records (input 1)
-  FALSE → Mandatory Domain Gate → Check Mandatory Domain
-            TRUE  → Build Mandatory Domain Reject Record → Merge Final Records (input 1)
-            FALSE → AI - Verified Review → Normalize Verified Review → …
+  FALSE → Mandatory Travel Gate → Check Mandatory Travel
+            TRUE  → Build Mandatory Travel Reject Record → Merge Final Records (input 1)
+            FALSE → Mandatory Domain Gate → Check Mandatory Domain
+                      TRUE  → Build Mandatory Domain Reject Record → Merge Final Records (input 1)
+                      FALSE → AI - Verified Review → Normalize Verified Review → …
 ```
 
 ### Frozen (do not change without explicit approval)
@@ -134,6 +156,7 @@ Pre-Verified gate work from v17 reference. One commit per gate unless noted.
 | OPEN | **EMEA-C4** | Country-list remote / explicit residency | Post-Extract chain |
 | OPEN | **EMEA-C5** | Founder / co-founder role | Post-Extract chain; immediate predecessor to Verified |
 | DONE | `7ccdf7c5a96210adf14b18eac0b2986365383059` | **C6 — Closed posting (guest HTML markers)** | `Check Posting Closed` first after Extract; Mokrogoria fail-open |
+| DONE | `570c097e669dd1bb9d3d72facd0be1fef8970a1e` | **EMEA-TRAVEL — Mandatory travel >20%** | After C6, before C2; Fulchester `4434499750` travel sentence |
 
 **Target enrichment topology (after C3–C5):**
 
@@ -164,7 +187,7 @@ Extract → Closed → Country-list → Domain → Language → Founder → AI -
 
 | Status | ID | Item | Notes |
 |--------|-----|------|-------|
-| OPEN | **EMEA-TRAVEL** | Mandatory travel **>20%** hard reject | Fulchester `FullJobText`: *“Travel across the region as required (approx. 20–30%)”*. Separate commit from C2.1 |
+| DONE | **EMEA-TRAVEL** | Mandatory travel **>20%** hard reject | Commit `570c097e669dd1bb9d3d72facd0be1fef8970a1e`; Fulchester `4434499750`: *"Travel across the region as required (approx. 20–30%)"* |
 | OPEN | **EMEA-TZ** | Mandatory incompatible timezone | Verified Stage 1 prompt only; no pre-Verified gate |
 
 ### P2 — Verified / calibration (prompt-only, when approved)
@@ -179,8 +202,9 @@ Extract → Closed → Country-list → Domain → Language → Founder → AI -
 
 | Status | ID | Item | Notes |
 |--------|-----|------|-------|
-| OPEN | **PBG-001** | Preview open-for-verification calibration | See `docs/BG_PORTABILITY_BACKLOG.md` |
-| OPEN | **PBG-002** | Closed-posting gate | See `docs/BG_PORTABILITY_BACKLOG.md` |
+| OPEN | **PBG-001** | Preview open-for-verification calibration | Port to `Executive_Job_CRM_v1.1_BG_ONLY.json` after EMEA Limit 1 → 10 → 50 |
+| OPEN | **PBG-002** | Closed-posting gate (C6) | Port after EMEA validation; Mokrogoria fail-open ceiling applies |
+| OPEN | **PBG-003** | Mandatory travel >20% gate (EMEA-TRAVEL) | Port after EMEA validation; candidate policy: travel ≤20% acceptable |
 
 ### P3 — Documentation / hygiene
 
@@ -233,12 +257,28 @@ When `EnrichmentStatus` is not `OK` or `FullJobTextLength < 200`, deterministic 
 | Case | Input / condition | Expected |
 |------|-------------------|----------|
 | **A. Hard-close control** | JobId `3900000000`; raw guest HTML has `closed-job__flavor--closed` or phrase | `FINAL_REJECT` before Verified; `Status: Closed`; `auto_reject_reason: CLOSED_POSTING` |
-| **B. Open control** | JobId `4440043160`; no closed markers | Pass to Mandatory Domain Gate |
+| **B. Open control** | JobId `4440043160`; no closed markers | Pass to Mandatory Travel Gate |
 | **C. Mokrogoria (fail-open)** | JobId `4437213682`; UI closed, guest HTML has no marker | Pass through C6; may reach Verified |
 | **D. Fulchester (when stub)** | JobId `4434499750`; guest stub with markers | `FINAL_REJECT` before Verified |
 | **E. NO_URL path** | Missing/invalid URL | No HTTP; C6 skipped |
 | **F. HTTP error** | 403 / 429 / empty body | C6 fail-open |
 | **G. C2 integrity** | Mill `4436662085` mandatory domain | Unchanged downstream behavior when C6 does not fire |
+
+### Mandatory-travel gate (EMEA-TRAVEL — `570c097e669dd1bb9d3d72facd0be1fef8970a1e` DONE)
+
+| Case | Input / condition | Expected |
+|------|-------------------|----------|
+| **A. Fulchester travel** | JobId `4434499750`; `FullJobText` contains *"Travel across the region as required (approx. 20–30%)"* | `FINAL_REJECT` before Verified; `auto_reject_reason: MANDATORY_TRAVEL` |
+| **B. Up to 20%** | *"Up to 20% travel required"* | Pass |
+| **C. Range 10–20%** | *"10–20% travel required"* | Pass |
+| **D. Single 25%** | *"25% travel required"* | REJECT |
+| **E. Plus notation** | *"50%+ travel"* | REJECT |
+| **F. Minimum** | *"minimum 25% travel"* | REJECT |
+| **G. Occasional** | *"occasional travel"* | Pass |
+| **H. May be required** | *"travel may be required"* (no %) | Pass |
+| **I. Preferred** | *"travel preferred"* | Pass |
+| **J. Enrichment fail-open** | `EnrichmentStatus != OK` | `MandatoryTravelBlocked = false` |
+| **K. C6 / C2 integrity** | Closed stub / Mill domain | Unchanged when travel gate does not fire |
 
 ### Protected paths (must not regress)
 
@@ -253,6 +293,7 @@ When `EnrichmentStatus` is not `OK` or `FullJobTextLength < 200`, deterministic 
 
 | Status | Target | Command |
 |--------|--------|---------|
+| DONE | EMEA-TRAVEL only (`570c097e669dd1bb9d3d72facd0be1fef8970a1e`) | `git revert 570c097e669dd1bb9d3d72facd0be1fef8970a1e` |
 | DONE | C6 only (`7ccdf7c5a96210adf14b18eac0b2986365383059`) | `git revert 7ccdf7c5a96210adf14b18eac0b2986365383059` |
 | DONE | C2.1 only (`3ebeaf0326afc5a2a623cb6eb15e264ccba95b7c`) | `git revert 3ebeaf0326afc5a2a623cb6eb15e264ccba95b7c` |
 | DONE | C2 structural (`8773158`) | `git checkout 8773158 -- workflows/Executive-Job-CRM-v1.1-DEV.json` |
@@ -262,4 +303,4 @@ When `EnrichmentStatus` is not `OK` or `FullJobTextLength < 200`, deterministic 
 
 ---
 
-*Last updated: 2026-07-15 — baseline `7ccdf7c5a96210adf14b18eac0b2986365383059` (DONE). `EMEA-C6` DONE at `7ccdf7c5a96210adf14b18eac0b2986365383059`. Mokrogoria remains fail-open when guest HTML has no closure marker. Next open: `EMEA-C2-TEST`.*
+*Last updated: 2026-07-15 — baseline `570c097e669dd1bb9d3d72facd0be1fef8970a1e` (DONE). `EMEA-TRAVEL` DONE at `570c097e669dd1bb9d3d72facd0be1fef8970a1e`. Next open: `EMEA-C2-TEST`.*
