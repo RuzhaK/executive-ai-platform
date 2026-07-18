@@ -834,7 +834,6 @@
             "Location": "={{$json.Location}}",
             "URL": "={{ $json.URL }}",
             "Remote": "={{ $json.RemoteFit }}",
-            "Score": "={{ $json.OutputScore }}",
             "Interview Probability": "={{$json.InterviewProbability}}",
             "Recommended CV": "={{ $json.OutputRecommendedCV }}",
             "Recommendation": "={{ $json.OutputRecommendation }}",
@@ -971,7 +970,8 @@
               "defaultMatch": false,
               "display": true,
               "type": "string",
-              "canBeUsedToMatch": true
+              "canBeUsedToMatch": true,
+              "removed": true
             },
             {
               "id": "Interview Probability",
