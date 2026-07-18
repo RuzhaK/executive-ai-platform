@@ -48,12 +48,25 @@ Use these statuses on every tracked item (commit, gate, or backlog ID):
 | Item | Value |
 |------|--------|
 | **Branch** | `emea-v1.1` |
-| **Commit** | `2db88cf490974b57c0078b5ae9056a6dd85b01c4` — `feat(emea): add targeted executive operations preview floor` |
+| **Commit** | `2bc9b6ca0d00af2af2378ae38abf7c7e68edcaff` — `feat(emea): allow targeted exec ops preview pass at score 6` |
 | **Workflow file** | `workflows/Executive-Job-CRM-v1.1-DEV.json` |
 | **Nodes / connections** | 52 / 61 |
 | **Regression label** | `jobs-exec-crm-regression` |
 | **DEV spreadsheet** | `Executive Job CRM - EMEA DEV` (`1x_f_DK5yi3FprfIo2w1Pf1Q9VaAeUeMm66gOnR7igJs`) |
-| **Validated regression workbook** | `Executive Job CRM - EMEA DEV v22.xlsx` (Commit 4 runtime PASS) |
+| **Validated regression workbook** | `Executive Job CRM - EMEA DEV v24.xlsx` (Commit 5 runtime PASS) |
+
+### Commit 5 validation (2026-07-18)
+
+| Field | Value |
+|-------|--------|
+| **Backlog ID** | **EMEA-EXEC-OPS-THRESHOLD** |
+| **Commit** | `2bc9b6ca0d00af2af2378ae38abf7c7e68edcaff` |
+| **Node changed** | `Preview Score Job` only |
+| **Runtime status** | **PASS** (live n8n) |
+| **Primary case** | Business Support and Operations Director — `PreviewScore = 6`, `PreviewRecommendation = MONITOR`, `PreviewPassesThreshold = true`; continues through enrichment and Verified AI → `FinalDecision = APPLY NOW`, `PipelineStage = FINAL_ACCEPT` |
+| **Negative controls** | Head of e-commerce variants remain `PREVIEW_REJECT` |
+| **Regression catalog** | **EMEA-EXEC-OPS-THRESH-A** → **PASS**; **EMEA-EXEC-OPS-THRESH-N1** → **PASS** |
+| **Notes** | Option B: global `PreviewScoreThreshold` stays **7**; allowlisted exec-ops titles pass at floored score **6** via `qualifiesForExecOpsFloor`. Initial v23 run matched Commit 4 until workflow re-imported — runtime version mismatch, not code defect. |
 
 ### Commit 4 validation (2026-07-18)
 
@@ -213,6 +226,7 @@ Searched 2026-07-17 (prior REJECT reconstruction attempt):
 | DONE | `05a4c5f` | German title gate applied to output-norm baseline |
 | DONE | `330a3ea` | Stop writing legacy `Score` column to CRM sheet |
 | DONE | `2db88cf` | **Commit 4** — targeted executive-operations preview floor (`EXEC_OPS_PREVIEW_SCORE_FLOOR = 6`); **n8n validated** (`v22.xlsx`) |
+| DONE | `2bc9b6c` | **Commit 5** — targeted exec-ops preview pass at score 6 (`qualifiesForExecOpsFloor`; threshold **7** unchanged); **n8n validated** (`v24.xlsx`) |
 
 ---
 
@@ -321,6 +335,8 @@ Stable, re-runnable cases with documented n8n validation. Not an execution archi
 |---------|------------|------|-------|-------------------|-----------|--------|
 | **EMEA-TRAVEL-A** | EMEA-TRAVEL | POSITIVE | Fulchester Consultants / Managing Director / JobId `4434499750`; `EnrichmentStatus=OK`; `FullJobTextLength=3304`; travel *"as required (approx. 20–30%)"* | `FINAL_REJECT`; `PipelineStage=FINAL_REJECT`; `RejectReason: Mandatory travel above 20%: 20-30%`; `auto_reject_reason: MANDATORY_TRAVEL`; Verified does not run | `355c91b` · 2026-07-17 · Limit 1 (n8n) | **PASS** |
 | **EMEA-EXEC-OPS-FLOOR-A** | EMEA-EXEC-OPS-FLOOR | POSITIVE | Business Support and Operations Director; AI `preview_score` below 6 | `PreviewScore = 6`; `PreviewRecommendation = MONITOR`; `PreviewPassesThreshold = false`; `PipelineStage = PREVIEW_REJECT` (threshold **7**) | `2db88cf` · 2026-07-18 · Limit 1 (n8n) · workbook `Executive Job CRM - EMEA DEV v22.xlsx` | **PASS** |
+| **EMEA-EXEC-OPS-THRESH-A** | EMEA-EXEC-OPS-THRESHOLD | POSITIVE | Business Support and Operations Director; JobId `4439702062` | `PreviewScore = 6`; `PreviewRecommendation = MONITOR`; `PreviewPassesThreshold = true`; enrichment + Verified run; `FinalDecision = APPLY NOW`; `PipelineStage = FINAL_ACCEPT` | `2bc9b6c` · 2026-07-18 · Limit 1 (n8n) · workbook `Executive Job CRM - EMEA DEV v24.xlsx` | **PASS** |
+| **EMEA-EXEC-OPS-THRESH-N1** | EMEA-EXEC-OPS-THRESHOLD | NEGATIVE | Head of e-commerce variants (non-allowlisted) | `PreviewPassesThreshold = false`; `PipelineStage = PREVIEW_REJECT` | `2bc9b6c` · 2026-07-18 · Limit 1 (n8n) · workbook `Executive Job CRM - EMEA DEV v24.xlsx` | **PASS** |
 
 *Additional cases (e.g. C2.1 Fulchester domain, C6 controls, full Commit 4 title matrix) — add only after explicit n8n regression validation.*
 
