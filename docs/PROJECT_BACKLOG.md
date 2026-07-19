@@ -48,12 +48,28 @@ Use these statuses on every tracked item (commit, gate, or backlog ID):
 | Item | Value |
 |------|--------|
 | **Branch** | `emea-v1.1` |
-| **Commit** | `2bc9b6ca0d00af2af2378ae38abf7c7e68edcaff` — `feat(emea): allow targeted exec ops preview pass at score 6` |
+| **Commit** | `ee48c2a611d55c3a13224bbd229821941a6bc26f` — `EMEA-C3: Add deterministic mandatory language gate with conservative skill-context detection` |
 | **Workflow file** | `workflows/Executive-Job-CRM-v1.1-DEV.json` |
-| **Nodes / connections** | 52 / 61 |
+| **Nodes / connections** | 55 / 66 |
 | **Regression label** | `jobs-exec-crm-regression` |
 | **DEV spreadsheet** | `Executive Job CRM - EMEA DEV` (`1x_f_DK5yi3FprfIo2w1Pf1Q9VaAeUeMm66gOnR7igJs`) |
-| **Validated regression workbook** | `Executive Job CRM - EMEA DEV v24.xlsx` (Commit 5 runtime PASS) |
+| **Validated regression workbook** | `Executive Job CRM - EMEA DEV v25.xlsx` (EMEA-C3 runtime PASS WITH EXPLANATION) |
+
+### EMEA-C3 validation (2026-07-19)
+
+| Field | Value |
+|-------|--------|
+| **Backlog ID** | **EMEA-C3** |
+| **Commit** | `ee48c2a611d55c3a13224bbd229821941a6bc26f` |
+| **Nodes added** | `Mandatory Language Gate`, `Check Mandatory Language`, `Build Mandatory Language Reject Record` |
+| **Runtime status** | **PASS WITH EXPLANATION** (live n8n · Limit 1) |
+| **Workbook** | `Executive Job CRM - EMEA DEV v25.xlsx` |
+| **Email fetched** | One message (`EmailId=19f5dee4ab0568dc`; `TestLabelUsed=jobs-exec-crm-regression`) |
+| **Job cards extracted** | **4** from that email |
+| **Language gate — enriched jobs** | Mokrogoria co-founder + Kaderabotim Business Support and Operations Director: gate **executed**, `MandatoryLanguageBlocked=false`, FALSE branch → `AI - Verified Review` |
+| **Language gate — preview rejects** | Two Head of e-commerce variants: **not reached** (stopped at Preview); expected |
+| **Limit=1 note** | Four sheet rows because **`MaxJobCards=1` was not in effect** (effective cap ≥ 4; workflow JSON default **10**). Strict Limit=1 requires **both** `TestMaxResults=1` **and** `MaxJobCards=1`. Not a gate defect. |
+| **Policy** | Conservative skill-context detection: block only explicit candidate language-ability mandates; citizenship/market/sector/bare `{lang} required` pass |
 
 ### Commit 5 validation (2026-07-18)
 
@@ -88,7 +104,7 @@ Policy Engine → Check Language in Title
   FALSE → AI - Preview Score Job → …
 ```
 
-### Post-Extract pre-Verified chain (C6 + TRAVEL + C2)
+### Post-Extract pre-Verified chain (C6 + TRAVEL + C2 + C3)
 
 ```
 Extract LinkedIn Job Description → Check Posting Closed
@@ -97,7 +113,9 @@ Extract LinkedIn Job Description → Check Posting Closed
             TRUE  → Build Mandatory Travel Reject Record → Merge Final Records (input 1)
             FALSE → Mandatory Domain Gate → Check Mandatory Domain
                       TRUE  → Build Mandatory Domain Reject Record → Merge Final Records (input 1)
-                      FALSE → AI - Verified Review → Normalize Verified Review → …
+                      FALSE → Mandatory Language Gate → Check Mandatory Language
+                                TRUE  → Build Mandatory Language Reject Record → Merge Final Records (input 1)
+                                FALSE → AI - Verified Review → Normalize Verified Review → …
 ```
 
 ### Frozen (do not change without explicit approval)
@@ -227,6 +245,7 @@ Searched 2026-07-17 (prior REJECT reconstruction attempt):
 | DONE | `330a3ea` | Stop writing legacy `Score` column to CRM sheet |
 | DONE | `2db88cf` | **Commit 4** — targeted executive-operations preview floor (`EXEC_OPS_PREVIEW_SCORE_FLOOR = 6`); **n8n validated** (`v22.xlsx`) |
 | DONE | `2bc9b6c` | **Commit 5** — targeted exec-ops preview pass at score 6 (`qualifiesForExecOpsFloor`; threshold **7** unchanged); **n8n validated** (`v24.xlsx`) |
+| DONE | `ee48c2a` | **EMEA-C3** — mandatory language gate (conservative skill-context) on `FullJobText`; **n8n validated** (`v25.xlsx` · PASS WITH EXPLANATION) |
 
 ---
 
@@ -241,16 +260,16 @@ Pre-Verified gate work from v17 reference. One commit per gate unless noted.
 | DONE | `8773158` | **C2 — Mandatory specialized domain (structural move)** | Post-Extract, pre-Verified (`Mandatory Domain Gate` on `FullJobText`) |
 | DONE | `3ebeaf0326afc5a2a623cb6eb15e264ccba95b7c` | **C2.1 — `hasMandatoryLanguage` proven-within regex** | `Mandatory Domain Gate` only; Fulchester `4434499750` |
 | OPEN | **EMEA-C2-TEST** | C2 regression Limit 1 → 10 → 50 | After C2.1 |
-| OPEN | **EMEA-C3** | Mandatory language (FullJobText) | Post-Extract chain |
+| DONE | `ee48c2a` | **EMEA-C3 — Mandatory language (FullJobText)** | Post-Extract chain; conservative skill-context policy |
 | OPEN | **EMEA-C4** | Country-list remote / explicit residency | Post-Extract chain |
 | OPEN | **EMEA-C5** | Founder / co-founder role | Post-Extract chain; immediate predecessor to Verified |
 | DONE | `7ccdf7c5a96210adf14b18eac0b2986365383059` | **C6 — Closed posting (guest HTML markers)** | `Check Posting Closed` first after Extract; Mokrogoria fail-open |
 | DONE | `355c91b33fb0fa18907e972a3c632fcd51aff1f4` | **EMEA-TRAVEL — Mandatory travel >20%** | Gate `570c097`; chunk fix `355c91b`; **n8n validated** Fulchester `4434499750` |
 
-**Target enrichment topology (after C3–C5):**
+**Target enrichment topology (after C4–C5):**
 
 ```
-Extract → Closed → Country-list → Domain → Language → Founder → AI - Verified Review
+Extract → Closed → Travel → Domain → Language → Country-list → Founder → AI - Verified Review
 ```
 
 ### Known coverage ceiling — closed posting (C6)
@@ -337,8 +356,10 @@ Stable, re-runnable cases with documented n8n validation. Not an execution archi
 | **EMEA-EXEC-OPS-FLOOR-A** | EMEA-EXEC-OPS-FLOOR | POSITIVE | Business Support and Operations Director; AI `preview_score` below 6 | `PreviewScore = 6`; `PreviewRecommendation = MONITOR`; `PreviewPassesThreshold = false`; `PipelineStage = PREVIEW_REJECT` (threshold **7**) | `2db88cf` · 2026-07-18 · Limit 1 (n8n) · workbook `Executive Job CRM - EMEA DEV v22.xlsx` | **PASS** |
 | **EMEA-EXEC-OPS-THRESH-A** | EMEA-EXEC-OPS-THRESHOLD | POSITIVE | Business Support and Operations Director; JobId `4439702062` | `PreviewScore = 6`; `PreviewRecommendation = MONITOR`; `PreviewPassesThreshold = true`; enrichment + Verified run; `FinalDecision = APPLY NOW`; `PipelineStage = FINAL_ACCEPT` | `2bc9b6c` · 2026-07-18 · Limit 1 (n8n) · workbook `Executive Job CRM - EMEA DEV v24.xlsx` | **PASS** |
 | **EMEA-EXEC-OPS-THRESH-N1** | EMEA-EXEC-OPS-THRESHOLD | NEGATIVE | Head of e-commerce variants (non-allowlisted) | `PreviewPassesThreshold = false`; `PipelineStage = PREVIEW_REJECT` | `2bc9b6c` · 2026-07-18 · Limit 1 (n8n) · workbook `Executive Job CRM - EMEA DEV v24.xlsx` | **PASS** |
+| **EMEA-C3-A** | EMEA-C3 | POSITIVE | Mokrogoria co-founder + Kaderabotim Business Support and Operations Director; `EnrichmentStatus=OK`; regression email `19f5dee4ab0568dc` | Language gate executes; `MandatoryLanguageBlocked=false`; FALSE branch → Verified; no `auto_reject_reason=MANDATORY_LANGUAGE` | `ee48c2a` · 2026-07-19 · Limit 1 (n8n) · workbook `Executive Job CRM - EMEA DEV v25.xlsx` | **PASS** |
+| **EMEA-C3-N1** | EMEA-C3 | NEGATIVE | Head of e-commerce variants on same email | `PREVIEW_REJECT` before Extract; language gate not reached | `ee48c2a` · 2026-07-19 · Limit 1 (n8n) · workbook `Executive Job CRM - EMEA DEV v25.xlsx` | **PASS** |
 
-*Additional cases (e.g. C2.1 Fulchester domain, C6 controls, full Commit 4 title matrix) — add only after explicit n8n regression validation.*
+*Additional cases (e.g. C2.1 Fulchester domain, C6 controls, explicit language BLOCK corpus) — add only after explicit n8n regression validation.*
 
 ---
 
@@ -391,6 +412,17 @@ When `EnrichmentStatus` is not `OK` or `FullJobTextLength < 200`, deterministic 
 | **F. HTTP error** | 403 / 429 / empty body | C6 fail-open |
 | **G. C2 integrity** | Mill `4436662085` mandatory domain | Unchanged downstream behavior when C6 does not fire |
 
+### Mandatory-language gate (EMEA-C3 — `ee48c2a611d55c3a13224bbd229821941a6bc26f` validated)
+
+| Case | Input / condition | Expected |
+|------|-------------------|----------|
+| **A. Skill mandate (BLOCK)** | *Fluent German required*; *Native French speaker essential*; *Must speak Italian*; *Professional fluency in Dutch is mandatory*; *Excellent written and spoken Spanish required* (in `FullJobText`, `EnrichmentStatus=OK`, length ≥ 200) | `FINAL_REJECT` before Verified; `auto_reject_reason: MANDATORY_LANGUAGE` |
+| **B. Ambiguous / non-skill (PASS)** | *German required*; citizenship; work authorization; market/sector; *English required, German preferred*; localization duties; *German-speaking customers* | Pass to Verified (conservative policy) |
+| **C. Enrichment fail-open** | `EnrichmentStatus != OK` or `FullJobTextLength < 200` | `MandatoryLanguageBlocked = false` |
+| **D. Allowlist** | English / Bulgarian skill mandates | Pass (working-language allowlist) |
+| **E. C2 / travel integrity** | Fulchester domain / travel cases | Unchanged when language gate does not fire |
+| **F. Preview path** | Jobs stopping at Preview | Language gate not reached; expected |
+
 ### Mandatory-travel gate (EMEA-TRAVEL — `355c91b33fb0fa18907e972a3c632fcd51aff1f4` validated)
 
 | Case | Input / condition | Expected |
@@ -442,7 +474,8 @@ Controlled case for **Verified/score/enrichment repeatability** — not a travel
 | SUPERSEDED | Misplaced C2 (`9acb019`) | `git checkout 9acb019 -- workflows/Executive-Job-CRM-v1.1-DEV.json` |
 | DONE | C1 only (no C2) | `git checkout 7514dc2 -- workflows/Executive-Job-CRM-v1.1-DEV.json` |
 | DONE | Phase 3A.3 baseline | `git checkout b80d15b -- workflows/Executive-Job-CRM-v1.1-DEV.json` |
+| DONE | EMEA-C3 only (`ee48c2a611d55c3a13224bbd229821941a6bc26f`) | `git revert ee48c2a611d55c3a13224bbd229821941a6bc26f` |
 
 ---
 
-*Last updated: 2026-07-17 — baseline `355c91b33fb0fa18907e972a3c632fcd51aff1f4`. `DOC-ARCH-REFRESH` OPEN (architecture audit complete; no doc update yet). Next: `EMEA-OUTPUT-NORM`.*
+*Last updated: 2026-07-19 — baseline `ee48c2a611d55c3a13224bbd229821941a6bc26f` (EMEA-C3 DONE). `DOC-ARCH-REFRESH` OPEN (architecture docs not yet committed). Next approved gate: **EMEA-C4**.*
