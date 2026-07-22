@@ -48,5 +48,17 @@ Preview calibration and output-contract commits on `Executive-Job-CRM-v1.1-DEV.j
 | `330a3ea` | Stop writing legacy `Score` column to CRM sheet | — |
 | `2db88cf` | Targeted executive-operations preview floor (`Preview Score Job`; floor **6**, threshold **7**) | **Yes** — `Executive Job CRM - EMEA DEV v22.xlsx`; Business Support and Operations Director → `PreviewScore = 6`, `MONITOR`, preview gate still fails at 7 |
 | `2bc9b6c` | Targeted exec-ops preview pass at score 6 (`qualifiesForExecOpsFloor`; global threshold **7** unchanged) | **Yes** — `Executive Job CRM - EMEA DEV v24.xlsx`; Business Support and Operations Director → `PreviewScore = 6`, `MONITOR`, `PreviewPassesThreshold = true`, full pipeline → `APPLY NOW` / `FINAL_ACCEPT`; Head of e-commerce variants remain `PREVIEW_REJECT` |
+| `90d7a3c` | EMEA-C4 country eligibility gate on `FullJobText` (Track A remote country-list · Track B explicit eligibility; `COUNTRY_ELIGIBILITY`) | Offline matrix 17/17; Limit 50 PASS path — `Executive Job CRM - EMEA DEV v27.xlsx` |
+| `df37378` | **EMEA v1.1 release baseline** — `PreviewScoreThreshold = 5` (Preview Score Job only); Verified threshold **7** unchanged | **Yes** — Airalo Strategy Director JobId `4430353001` → Enrichment OK → `COUNTRY_ELIGIBILITY` → `FINAL_REJECT`; Verified AI skipped |
 
-**Current validated baseline:** `2bc9b6ca0d00af2af2378ae38abf7c7e68edcaff`
+### EMEA v1.1 release (`df37378`) — 2026-07-22
+
+- **Preview opening threshold:** **5** (was 7 at Limit 50 baseline `v27`)
+- **Verified threshold:** **7** (unchanged)
+- **EMEA-C4:** **COMPLETE** — PASS @ Limit 50; BLOCK @ Airalo targeted test
+- **Runtime BLOCK validation case:** Airalo / Strategy Director / JobId `4430353001`
+- **Topology:** 58 nodes / 70 connections
+- **Next gate (not in v1.1 tag):** EMEA-C5 (founder/co-founder)
+- **Future work (backlog only):** `EMEA-PREVIEW-CALIBRATION` — evaluate thresholds 5/6/7 on larger datasets; improve Preview scoring for strategy/director roles without materially increasing enrichment cost
+
+**Current validated baseline:** `df37378c0c1d81a66eea4228bdea5045298e5e0f` (ready to tag as EMEA v1.1)

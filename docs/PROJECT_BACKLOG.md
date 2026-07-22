@@ -48,12 +48,27 @@ Use these statuses on every tracked item (commit, gate, or backlog ID):
 | Item | Value |
 |------|--------|
 | **Branch** | `emea-v1.1` |
-| **Commit** | `ee48c2a611d55c3a13224bbd229821941a6bc26f` — `EMEA-C3: Add deterministic mandatory language gate with conservative skill-context detection` |
+| **Commit** | `df37378c0c1d81a66eea4228bdea5045298e5e0f` — `feat(emea): finalize v1.1 with Preview threshold 5 and C4 runtime validation` |
 | **Workflow file** | `workflows/Executive-Job-CRM-v1.1-DEV.json` |
-| **Nodes / connections** | 55 / 66 |
+| **Nodes / connections** | 58 / 70 |
+| **PreviewScoreThreshold** | **5** (`Preview Score Job`) |
+| **VerifiedScoreThreshold** | **7** (unchanged) |
 | **Regression label** | `jobs-exec-crm-regression` |
 | **DEV spreadsheet** | `Executive Job CRM - EMEA DEV` (`1x_f_DK5yi3FprfIo2w1Pf1Q9VaAeUeMm66gOnR7igJs`) |
-| **Validated regression workbook** | `Executive Job CRM - EMEA DEV v25.xlsx` (EMEA-C3 runtime PASS WITH EXPLANATION) |
+| **EMEA v1.1 status** | **RELEASE BASELINE** — C4 runtime validated; ready to tag |
+
+### EMEA-C4 validation (2026-07-22)
+
+| Field | Value |
+|-------|--------|
+| **Backlog ID** | **EMEA-C4** |
+| **Workflow commits** | `90d7a3c` (gate implementation) · `df37378` (Preview threshold **5** + release baseline) |
+| **Nodes added (C4)** | `Country List Remote Gate`, `Check Country List Remote`, `Build Country List Remote Reject Record` |
+| **Runtime status** | **PASS** — PASS path at Limit 50 (`v27.xlsx` @ `90d7a3c`); **BLOCK path validated** (targeted Limit 1 @ `df37378`) |
+| **Primary BLOCK case** | **Airalo** / Strategy Director / JobId **`4430353001`** / TestEmailId `19f5f37ea77ea075` |
+| **Observed BLOCK path** | `PreviewScore = 5`, `PreviewPassesThreshold = true` → Enrichment OK → `auto_reject_reason = COUNTRY_ELIGIBILITY` → `PipelineStage = FINAL_REJECT`; Verified AI skipped |
+| **Offline matrix** | 17/17 PASS (`_emea_c4_matrix_test.js`) |
+| **Regression catalog** | **EMEA-C4-A** (PASS @ Limit 50) · **EMEA-C4-N1** (BLOCK @ Airalo targeted test) → **PASS** |
 
 ### EMEA-C3 validation (2026-07-19)
 
@@ -82,7 +97,7 @@ Use these statuses on every tracked item (commit, gate, or backlog ID):
 | **Primary case** | Business Support and Operations Director — `PreviewScore = 6`, `PreviewRecommendation = MONITOR`, `PreviewPassesThreshold = true`; continues through enrichment and Verified AI → `FinalDecision = APPLY NOW`, `PipelineStage = FINAL_ACCEPT` |
 | **Negative controls** | Head of e-commerce variants remain `PREVIEW_REJECT` |
 | **Regression catalog** | **EMEA-EXEC-OPS-THRESH-A** → **PASS**; **EMEA-EXEC-OPS-THRESH-N1** → **PASS** |
-| **Notes** | Option B: global `PreviewScoreThreshold` stays **7**; allowlisted exec-ops titles pass at floored score **6** via `qualifiesForExecOpsFloor`. Initial v23 run matched Commit 4 until workflow re-imported — runtime version mismatch, not code defect. |
+| **Notes** | Option B (historical @ `2bc9b6c`): global `PreviewScoreThreshold` was **7** with exec-ops floor at **6**. **Released baseline (`df37378`) sets global threshold to 5.** Exec-ops floor logic retained. |
 
 ### Commit 4 validation (2026-07-18)
 
@@ -104,7 +119,7 @@ Policy Engine → Check Language in Title
   FALSE → AI - Preview Score Job → …
 ```
 
-### Post-Extract pre-Verified chain (C6 + TRAVEL + C2 + C3)
+### Post-Extract pre-Verified chain (C6 + TRAVEL + C2 + C3 + C4)
 
 ```
 Extract LinkedIn Job Description → Check Posting Closed
@@ -115,7 +130,9 @@ Extract LinkedIn Job Description → Check Posting Closed
                       TRUE  → Build Mandatory Domain Reject Record → Merge Final Records (input 1)
                       FALSE → Mandatory Language Gate → Check Mandatory Language
                                 TRUE  → Build Mandatory Language Reject Record → Merge Final Records (input 1)
-                                FALSE → AI - Verified Review → Normalize Verified Review → …
+                                FALSE → Country List Remote Gate → Check Country List Remote
+                                          TRUE  → Build Country List Remote Reject Record → Merge Final Records (input 1)
+                                          FALSE → AI - Verified Review → Normalize Verified Review → …
 ```
 
 ### Frozen (do not change without explicit approval)
@@ -246,6 +263,8 @@ Searched 2026-07-17 (prior REJECT reconstruction attempt):
 | DONE | `2db88cf` | **Commit 4** — targeted executive-operations preview floor (`EXEC_OPS_PREVIEW_SCORE_FLOOR = 6`); **n8n validated** (`v22.xlsx`) |
 | DONE | `2bc9b6c` | **Commit 5** — targeted exec-ops preview pass at score 6 (`qualifiesForExecOpsFloor`; threshold **7** unchanged); **n8n validated** (`v24.xlsx`) |
 | DONE | `ee48c2a` | **EMEA-C3** — mandatory language gate (conservative skill-context) on `FullJobText`; **n8n validated** (`v25.xlsx` · PASS WITH EXPLANATION) |
+| DONE | `90d7a3c` | **EMEA-C4** — country-list remote / explicit eligibility gate on `FullJobText`; offline matrix 17/17 |
+| DONE | `df37378` | **EMEA v1.1 release** — `PreviewScoreThreshold = 5`; C4 BLOCK runtime validated (Airalo `4430353001`) |
 
 ---
 
@@ -261,7 +280,7 @@ Pre-Verified gate work from v17 reference. One commit per gate unless noted.
 | DONE | `3ebeaf0326afc5a2a623cb6eb15e264ccba95b7c` | **C2.1 — `hasMandatoryLanguage` proven-within regex** | `Mandatory Domain Gate` only; Fulchester `4434499750` |
 | OPEN | **EMEA-C2-TEST** | C2 regression Limit 1 → 10 → 50 | After C2.1 |
 | DONE | `ee48c2a` | **EMEA-C3 — Mandatory language (FullJobText)** | Post-Extract chain; conservative skill-context policy |
-| OPEN | **EMEA-C4** | Country-list remote / explicit residency | Post-Extract chain |
+| DONE | `90d7a3c` / `df37378` | **EMEA-C4 — Country-list remote / explicit eligibility** | Post-Extract chain; PASS @ Limit 50; BLOCK @ Airalo targeted test |
 | OPEN | **EMEA-C5** | Founder / co-founder role | Post-Extract chain; immediate predecessor to Verified |
 | DONE | `7ccdf7c5a96210adf14b18eac0b2986365383059` | **C6 — Closed posting (guest HTML markers)** | `Check Posting Closed` first after Extract; Mokrogoria fail-open |
 | DONE | `355c91b33fb0fa18907e972a3c632fcd51aff1f4` | **EMEA-TRAVEL — Mandatory travel >20%** | Gate `570c097`; chunk fix `355c91b`; **n8n validated** Fulchester `4434499750` |
@@ -302,6 +321,7 @@ Extract → Closed → Travel → Domain → Language → Country-list → Found
 
 | Status | ID | Item | Source |
 |--------|-----|------|--------|
+| OPEN | **EMEA-PREVIEW-CALIBRATION** | **Preview threshold & scoring calibration (post v1.1)** — evaluate Preview threshold **5 vs 6 vs 7** on larger regression datasets; improve Preview scoring for executive strategy/director roles; reduce false negatives without materially increasing enrichment cost. **Separate from released EMEA v1.1 baseline (`df37378`); do not change v1.1 tag without explicit approval.** | C4 BLOCK validation + v27 Limit 50 analysis |
 | OPEN | **EMEA-VER-P1** | Risk must drive `apply` / `final_decision` — no `APPLY NOW` with material blocker in `Verified Risk` | v13 calibration review |
 | OPEN | **EMEA-VER-P2** | Location / residency uncertainty → cap at `MONITOR`, not `APPLY NOW` | v13 review |
 | OPEN | **EMEA-VER-P3** | Propagate Stage 1 blocker text into `RejectReason` on score-0 hard rejects | v13 review |
@@ -358,6 +378,8 @@ Stable, re-runnable cases with documented n8n validation. Not an execution archi
 | **EMEA-EXEC-OPS-THRESH-N1** | EMEA-EXEC-OPS-THRESHOLD | NEGATIVE | Head of e-commerce variants (non-allowlisted) | `PreviewPassesThreshold = false`; `PipelineStage = PREVIEW_REJECT` | `2bc9b6c` · 2026-07-18 · Limit 1 (n8n) · workbook `Executive Job CRM - EMEA DEV v24.xlsx` | **PASS** |
 | **EMEA-C3-A** | EMEA-C3 | POSITIVE | Mokrogoria co-founder + Kaderabotim Business Support and Operations Director; `EnrichmentStatus=OK`; regression email `19f5dee4ab0568dc` | Language gate executes; `MandatoryLanguageBlocked=false`; FALSE branch → Verified; no `auto_reject_reason=MANDATORY_LANGUAGE` | `ee48c2a` · 2026-07-19 · Limit 1 (n8n) · workbook `Executive Job CRM - EMEA DEV v25.xlsx` | **PASS** |
 | **EMEA-C3-N1** | EMEA-C3 | NEGATIVE | Head of e-commerce variants on same email | `PREVIEW_REJECT` before Extract; language gate not reached | `ee48c2a` · 2026-07-19 · Limit 1 (n8n) · workbook `Executive Job CRM - EMEA DEV v25.xlsx` | **PASS** |
+| **EMEA-C4-A** | EMEA-C4 | POSITIVE | Limit 50 regression @ `90d7a3c`; enriched rows traverse C4 PASS path (e.g. Provenir, Xapo, Kaderabotim) | No `COUNTRY_ELIGIBILITY`; post-extract gates fire as expected; Verified runs on pass-path jobs | `90d7a3c` · 2026-07-22 · Limit 50 (n8n) · workbook `Executive Job CRM - EMEA DEV v27.xlsx` | **PASS** |
+| **EMEA-C4-N1** | EMEA-C4 | NEGATIVE | Airalo / Strategy Director / JobId `4430353001`; TestEmailId `19f5f37ea77ea075`; `PreviewScore = 5` @ threshold **5** | Enrichment OK → `auto_reject_reason = COUNTRY_ELIGIBILITY`; `CountryEligibilityBlockType = REMOTE_COUNTRY_LIST`; `PipelineStage = FINAL_REJECT`; Verified skipped | `df37378` · 2026-07-22 · Limit 1 targeted (n8n) | **PASS** |
 
 *Additional cases (e.g. C2.1 Fulchester domain, C6 controls, explicit language BLOCK corpus) — add only after explicit n8n regression validation.*
 
@@ -439,6 +461,17 @@ When `EnrichmentStatus` is not `OK` or `FullJobTextLength < 200`, deterministic 
 | **J. Enrichment fail-open** | `EnrichmentStatus != OK` | `MandatoryTravelBlocked = false` |
 | **K. C6 / C2 integrity** | Closed stub / Mill domain | Unchanged when travel gate does not fire |
 
+### Country-list remote / explicit eligibility gate (EMEA-C4 — `90d7a3c` / `df37378` validated)
+
+| Case | Input / condition | Expected |
+|------|-------------------|----------|
+| **A. Limit 50 PASS path (PASSED n8n)** | Enriched jobs without explicit country-list / residency mandate in `FullJobText` (e.g. Provenir, Xapo) | C4 FALSE branch → Verified; no `COUNTRY_ELIGIBILITY` |
+| **B. Airalo BLOCK (PASSED n8n)** | Airalo / Strategy Director / JobId `4430353001`; `PreviewScore = 5` @ threshold **5**; FullJobText restricts remote to Spain, UAE, UK | `FINAL_REJECT`; `auto_reject_reason: COUNTRY_ELIGIBILITY`; `CountryEligibilityBlockType: REMOTE_COUNTRY_LIST`; Verified skipped |
+| **C. Track B residency** | Explicit citizenship/residency mandate excluding Bulgaria in `FullJobText` | `EXPLICIT_ELIGIBILITY` block type when anchor matches |
+| **D. Enrichment fail-open** | `EnrichmentStatus != OK` or `FullJobTextLength < 200` | `CountryListRemoteBlocked = false` |
+| **E. Card label only** | LinkedIn card `United Kingdom · Remote` without posting clause | C4 PASS (text-evidence only) |
+| **F. C3 / travel / closed integrity** | Fulchester travel, Mill domain, closed posting | Unchanged when C4 does not fire |
+
 ### Repeatability — CleverMatch (OPEN; next test run)
 
 Controlled case for **Verified/score/enrichment repeatability** — not a travel-gate negative control. **Related but separate from EMEA-OUTPUT-NORM:** repeatability tests whether AI/score outcomes are stable; output normalization tests whether emitted fields consistently reflect whatever decision was produced.
@@ -475,7 +508,9 @@ Controlled case for **Verified/score/enrichment repeatability** — not a travel
 | DONE | C1 only (no C2) | `git checkout 7514dc2 -- workflows/Executive-Job-CRM-v1.1-DEV.json` |
 | DONE | Phase 3A.3 baseline | `git checkout b80d15b -- workflows/Executive-Job-CRM-v1.1-DEV.json` |
 | DONE | EMEA-C3 only (`ee48c2a611d55c3a13224bbd229821941a6bc26f`) | `git revert ee48c2a611d55c3a13224bbd229821941a6bc26f` |
+| DONE | EMEA-C4 only (`90d7a3c`) | `git revert 90d7a3c` |
+| DONE | Preview threshold 5 release (`df37378`) | `git revert df37378` |
 
 ---
 
-*Last updated: 2026-07-19 — baseline `ee48c2a611d55c3a13224bbd229821941a6bc26f` (EMEA-C3 DONE). `DOC-ARCH-REFRESH` OPEN (architecture docs not yet committed). Next approved gate: **EMEA-C4**.*
+*Last updated: 2026-07-22 — baseline `df37378c0c1d81a66eea4228bdea5045298e5e0f` (EMEA v1.1 release). **EMEA-C4 DONE.** `PreviewScoreThreshold = 5`. Next approved gate: **EMEA-C5**. **EMEA-PREVIEW-CALIBRATION** OPEN (future work; not in v1.1 tag).*
