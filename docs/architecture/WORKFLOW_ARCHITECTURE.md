@@ -3,8 +3,9 @@
 **Workflow:** `Executive Job CRM v1.1 - Development`  
 **File:** `workflows/Executive-Job-CRM-v1.1-DEV.json`  
 **Status:** Inactive (`active: false`)  
-**Nodes:** 17  
-**Trigger:** Gmail poll (every minute, label-filtered)
+**Nodes:** 60  
+**Connections:** 72  
+**Trigger:** Gmail poll (every minute, label-filtered; DEV harness overrides fetch selection)
 
 ---
 
@@ -45,9 +46,12 @@ flowchart TB
     N[Normalize Email Content]
   end
 
-  subgraph extract [Extraction]
+  subgraph extract [Extraction & CRM dedupe]
     AI1[AI - Extract Job Cards]
     P[Parse Job Cards]
+    READ[Read CRM Existing JobIds]
+    F[Filter New CRM JobIds]
+    CAP[DEV - Cap Max Job Cards]
   end
 
   subgraph filter [Filtering]
@@ -70,7 +74,11 @@ flowchart TB
     W[Execution Delay]
   end
 
-  T --> R --> E --> N --> AI1 --> P --> L
+  T --> R --> E --> N --> AI1 --> P
+  P --> READ
+  P --> F
+  READ -.->|executeOnce sheet read via $()| F
+  F --> CAP --> L
   L -->|LocationAllowed = true| V
   L -->|LocationAllowed = false| BR
   V -->|Role & Company present| AI2
@@ -84,6 +92,8 @@ flowchart TB
 
 **Fan-out:** `Parse Job Cards` emits **one item per valid job card**. All downstream nodes run **once per job**, not once per email.
 
+**Commit 2B dedupe path:** After parse, `Read CRM Existing JobIds` loads the CRM sheet once per execution (parallel branch). `Filter New CRM JobIds` receives parsed items on `$input` and drops rows already present by **JobId** and/or **OpportunityKey** (sheet data via `$('Read CRM Existing JobIds')`). Surviving items pass through `DEV - Cap Max Job Cards` before policy gates and AI evaluation.
+
 **Fan-in:** `Merge Final Records` combines the verified-review path (input 0) and all reject paths (input 1).
 
 ---
@@ -92,12 +102,14 @@ flowchart TB
 
 | Stage | Nodes | Purpose |
 |-------|-------|---------|
-| **1. Trigger & fetch** | Gmail Trigger → Read → Extract | Detect new labeled emails and load full body |
-| **2. Normalize & extract** | Normalize Email → AI Extract → Parse Job Cards | Turn HTML into text; LLM extracts job cards; code validates and structures them |
-| **3. Gate** | Check Location → Validate Parsed Jobs | Deterministic filters before AI evaluation |
-| **4. Evaluate** | AI Initial → Normalize → Score check → AI Verified → Normalize | Profile/location scoring; second pass for score ≥ 7 |
-| **5. Reject handling** | Build Reject Record | Standardizes rejected jobs for CRM |
-| **6. Persist** | Merge → Sheets → Wait | Append row; throttle with 4s delay |
+| **1. Trigger & fetch** | DEV Config → Build Gmail Fetch Plan → Switch → Read/Search → Extract | Select Gmail input (production or DEV harness); load full body |
+| **2. Normalize & extract** | Normalize Email → AI Extract → Parse Job Cards | Turn HTML into text; LLM extracts job cards; code validates, dedupes in-run, and structures them |
+| **2b. Persistent CRM dedupe (Commit 2B)** | Read CRM Existing JobIds → Filter New CRM JobIds | Load existing CRM rows once; drop parsed jobs already present by **JobId** and/or reconstructed **OpportunityKey** |
+| **2c. DEV card cap** | DEV - Cap Max Job Cards (+ injectors) | Limit job cards per run when `TestMode=true`; regression fixtures — not production logic |
+| **3. Gate** | Policy Engine, language/domain/travel/country gates, Preview threshold, location/validation | Deterministic filters before and between AI stages |
+| **4. Evaluate** | Preview AI → Initial → Verified (+ enrichment on verified path) | Tiered AI evaluation with FullJobText on verified path |
+| **5. Reject handling** | Build * Reject Record nodes | Standardize rejected jobs for CRM |
+| **6. Persist** | Merge → Normalize Output → Gate Append → Sheets → Wait | Append row; throttle with 4s delay |
 
 ---
 
@@ -119,6 +131,50 @@ Nodes are listed in **logical execution order**.
 **Key output fields:** `id`, `threadId`, `snippet`, `labels`, `From`, `Subject`, `To`, `internalDate`
 
 **Notes:** Workflow is currently inactive; pinned test data exists on this node for manual runs.
+
+---
+
+### 5.1a DEV Config — Gmail Input Selection
+
+| | |
+|---|---|
+| **Type** | `set` v3.4 |
+| **Purpose** | **DEV/test harness only** — runtime Gmail fetch configuration (not production scoring or CRM logic) |
+| **Inputs** | Trigger metadata |
+| **Outputs** | Config object consumed by **Build Gmail Fetch Plan** |
+
+**Key fields (editable at runtime in n8n):**
+
+| Field | Role |
+|-------|------|
+| `TestMode` | When `true`, DEV fetch rules apply; when `false`, production uses LinkedIn label + limit 1 |
+| `TestLabel`, `TestMaxResults`, `TestEmailId`, `TestSubjectContains` | Regression / targeted fetch controls |
+| `TestReceivedAfter`, `TestReceivedBefore` | Date window for non-label search path |
+| **`BackfillReceivedBefore`** | **DEV backfill upper bound** (`YYYY-MM-DD`). Used when fetching by `TestLabel` — passed to Gmail search as `receivedBefore` (via `before:YYYY/MM/DD` in query). Ignores `TestReceivedAfter` / `TestReceivedBefore` on that path. |
+| **`BackfillReceivedAfter`** | **DEV backfill lower bound** (`YYYY-MM-DD`). Fallback for `receivedAfter` on the **non-label** search path when `TestReceivedAfter` is empty. |
+| `MaxJobCards` | Caps job cards after parse when `TestMode=true` (see **DEV - Cap Max Job Cards**) |
+
+**Scope:** These fields control **which emails enter the pipeline** during DEV/regression runs. They do not affect AI prompts, scoring, eligibility gates, or append schema. Production runs (`TestMode=false`) ignore backfill fields.
+
+---
+
+### 5.1b Build Gmail Fetch Plan
+
+| | |
+|---|---|
+| **Type** | `code` v2 |
+| **Purpose** | Translate **DEV Config** into Gmail fetch parameters for **Switch Gmail Fetch Mode** |
+| **Inputs** | DEV Config object |
+| **Outputs** | `{ fetchMode, labelIds, limit, q, receivedAfter, receivedBefore, ... }` |
+
+**Backfill wiring (DEV only, `TestMode=true`):**
+
+| Config field | Used when | Effect |
+|--------------|-----------|--------|
+| `BackfillReceivedBefore` | `TestLabel` search path | Sets `receivedBefore` on the search plan (upper date bound for one-time backfill batches) |
+| `BackfillReceivedAfter` | Default search path (no `TestLabel`) | Fallback for `receivedAfter` if `TestReceivedAfter` is empty |
+
+Dates are normalized to `YYYY-MM-DD` before use. **Not used** when `TestMode=false` (production path).
 
 ---
 
@@ -221,8 +277,60 @@ Nodes are listed in **logical execution order**.
 **Deterministic filters:**
 - **Location allowed:** Bulgaria; Remote Europe/EMEA/Worldwide/Global
 - **Fake company detection:** Blocks LinkedIn labels, work-type words, role-like company names
-- **Dedup:** Within-batch dedupe by `DedupeKey`
+- **Dedup (in-run):** JobId exact match, then **OpportunityKey** semantic dedupe (see below)
 - **Parse failures:** Silently skipped (no output item)
+
+**In-run dedupe (two layers, first wins):**
+
+| Layer | Key | Rule |
+|-------|-----|------|
+| 1 | `JobId` | Exact LinkedIn numeric ID from URL / hints |
+| 2 | `OpportunityKey` | Semantic key from normalized company + role + work arrangement |
+
+**OpportunityKey rules (`OPPORTUNITY-DEDUPE-V1` in Code):**
+
+| Work type | Key format |
+|-----------|------------|
+| Remote | `{normalizedCompany}\|{normalizedRole}\|remote` |
+| Hybrid / Onsite | `{normalizedCompany}\|{normalizedRole}\|{normalizedLocation}\|{normalizedWorkType}` |
+| Unspecified | `{normalizedCompany}\|{normalizedRole}\|{normalizedLocation}\|unspecified` |
+
+Work type is taken from `WorkType` and/or inferred from `Location` (`remote`, `hybrid`, `on-site` / `onsite`).
+
+> **Sync rule — `OPPORTUNITY-DEDUPE-V1`:** The marked block in this node (`DASH_VARIANTS`, `normalizeOpportunityText`, `normalizeWorkTypeForOpportunity`, `buildOpportunityKey`) must remain **byte-for-byte identical** to the same block in **`Filter New CRM JobIds`**. n8n Code nodes cannot share modules; copy both blocks together on any normalization change. Filter uses sheet `Company` / `Role` / `Location` (work type inferred from Location when `WorkType` is absent).
+
+---
+
+### 5.6a Read CRM Existing JobIds
+
+| | |
+|---|---|
+| **Type** | Google Sheets `read` (`executeOnce: true`) |
+| **Purpose** | Load existing CRM rows once per execution for persistent dedupe |
+| **Sheet** | Same spreadsheet / tab as **Append to Google Sheets** |
+| **Outputs** | All sheet rows (JobId sources: `DedupeKey`, `URL`; opportunity fields: `Company`, `Role`, `Location`) |
+
+---
+
+### 5.6b Filter New CRM JobIds
+
+| | |
+|---|---|
+| **Type** | `code` v2 (`runOnceForAllItems`) |
+| **Purpose** | Drop parsed jobs already present in CRM — **JobId** and/or **OpportunityKey** |
+| **Inputs** | `$input.all()` — parsed job items from **Parse Job Cards**; sheet rows via `$('Read CRM Existing JobIds').all()` |
+| **Outputs** | Subset of parsed items (unchanged fields; original `pairedItem` preserved via `{ ...item }`) |
+
+**Wiring:** `Parse Job Cards` → `Filter New CRM JobIds` (job items on `$input`). `Parse Job Cards` → `Read CRM Existing JobIds` runs in parallel; Filter references Read via `$()` so sheet data is available before dedupe. Do **not** route Read output into Filter `$input` (that breaks item lineage).
+
+**Persistent dedupe (Commit 2B):**
+
+| Check | Source on sheet row | Drop when |
+|-------|---------------------|-----------|
+| Exact JobId | `DedupeKey`, `URL` | Parsed JobId matches |
+| OpportunityKey | `Company`, `Role`, `Location` (+ inferred work type) | Parsed OpportunityKey matches |
+
+Uses the same **`OPPORTUNITY-DEDUPE-V1`** helpers as **Parse Job Cards** (see sync rule in §5.6). Does **not** modify AI, policy, enrichment, scoring, or append schema.
 
 ---
 
@@ -569,24 +677,61 @@ Email metadata
 { Subject, EmailText, LinkedInJobUrls*, Source }
     ↓  [AI extraction]
 { company, role, location, work_type, url } × N
-    ↓  [Parse Job Cards]
+    ↓  [Parse Job Cards — in-run dedupe]
 { Role, Company, JobId, Location, WorkType, URL,
   LocationAllowed, LocationRejectReason, DedupeKey, Status, Source }
+    ↓  [Filter New CRM JobIds — Commit 2B persistent dedupe]
+(subset only — jobs already in CRM by JobId or OpportunityKey produce no item)
+    ↓  [DEV cap / policy / AI stages …]
+    ↓
+Google Sheets row (Score / Recommendation / Recommended CV resolved at append)
+```
+
+### OpportunityKey dedupe (Commit 2B)
+
+**OpportunityKey** is a normalized semantic key for “same opportunity, different URL/JobId” cases. It is computed in Code (`OPPORTUNITY-DEDUPE-V1`) from:
+
+| Input | Use |
+|-------|-----|
+| `Company`, `Role` | Normalized text (case/diacritics/punctuation stripped) |
+| `Location`, `WorkType` | Work type from field and/or inferred from location |
+
+**Key formats:**
+
+| Work type | OpportunityKey |
+|-----------|----------------|
+| Remote | `{company}\|{role}\|remote` |
+| Hybrid / Onsite | `{company}\|{role}\|{location}\|{workType}` |
+| Unspecified | `{company}\|{role}\|{location}\|unspecified` |
+
+**Where it applies:**
+
+| Stage | Behavior |
+|-------|----------|
+| **Parse Job Cards** | In-run dedupe — second card with same OpportunityKey in the same execution is dropped |
+| **Filter New CRM JobIds** | Persistent dedupe — parsed job dropped if OpportunityKey matches a row already in CRM |
+
+**CRM reconstruction:** The filter does **not** read an `OpportunityKey` column from the sheet (none exists). It **rebuilds** OpportunityKey from each CRM row’s `Company`, `Role`, `Location`, and inferred work type — using the same helpers as parse.
+
+**Architectural trade-off:** Because OpportunityKey is **not stored** as its own sheet column, persistent dedupe depends on CRM field values remaining consistent with parse-time normalization. If `Company`, `Role`, `Location`, or `WorkType` on a stored row diverges from what parse would produce today (manual edits, append mapping changes, enrichment overwrites), dedupe may **fail to match** (duplicate append risk) or **over-match** (false skip risk). This is a documented **drift risk**, not a confirmed production defect — mitigation is the byte-for-byte sync rule between **Parse Job Cards** and **Filter New CRM JobIds** (§5.6, §5.6b).
+
+**JobId dedupe (unchanged layer):** Exact numeric LinkedIn ID still dedupes first via `JobId` / `DedupeKey` / URL parsing — independent of OpportunityKey.
+
+---
+
+### Legacy field evolution (AI stages)
+
+The following stages add fields on the item before append (unchanged by Commit 2B):
+
+```
     ↓  [Preview AI + Preview Score Job]
 + { PreviewScore, PreviewRecommendation, PreviewReason, PreviewRisk, PreviewCV }
     ↓  [AI initial evaluation + normalize]
-+ { InitialEvalScore, InitialEvalRecommendation, InitialEvalCV,
-    InterviewProbability, RemoteFit, CountryFit, SeniorityFit, SectorFit,
-    Priority, WhyApply, MainRisk }
++ { InitialEvalScore, InitialEvalRecommendation, InitialEvalCV, … }
     ↓  [verified path only]
-+ { VerifiedScore, VerifiedRecommendation, FinalCV,
-    SalaryEstimate, SalaryTarget, SalaryConfidence, SalaryAssumption,
-    VerifiedRisk, VerifiedWhyApply, VerifiedPriority,
-    LocationFit, FinalDecision }
++ { VerifiedScore, VerifiedRecommendation, FinalCV, FinalDecision, … }
     ↓  [reject paths]
 + { FinalDecision: REJECT*, RejectReason, Status: *Rejected, Verified*: '' }
-    ↓
-Google Sheets row (Score / Recommendation / Recommended CV resolved at append)
 ```
 
 ---
@@ -616,7 +761,7 @@ All paths converge at **Merge Final Records → Append to Google Sheets**.
 | Aspect | Behavior |
 |--------|----------|
 | **Concurrency** | One email per run (`limit: 1`); multiple jobs per email processed as separate items |
-| **Dedup** | In-batch only at parse stage; **no sheet lookup** for existing jobs |
+| **Dedup** | **In-run** at parse (`JobId` + `OpportunityKey`); **persistent** at Filter New CRM JobIds (sheet JobId + reconstructed OpportunityKey). See §7. |
 | **AI cost** | 1× mini model per email + 1× GPT-4.1 per eligible job + 1× GPT-5.5 per job scoring ≥ 7 |
 | **Failure handling** | Code nodes use try/catch with degraded defaults; Sheets node retries on failure |
 | **Active state** | Workflow disabled in export |
@@ -644,8 +789,9 @@ These values are **hardcoded in the export** and are environment-specific:
 1. **Two-layer filtering:** Deterministic rules in Code nodes (location, fake company) precede expensive AI evaluation.
 2. **Tiered AI pipeline:** Cheap extraction (mini) → standard evaluation (4.1) → premium verification (5.5) only for high scorers.
 3. **Reject transparency:** All filtered jobs are persisted to Sheets with reason codes, not silently dropped.
-4. **Monolithic design:** All logic in one workflow; no sub-workflows or external dedupe service.
+4. **Monolithic design:** All logic in one workflow; persistent dedupe uses an inline Sheets read + Code filter (Commit 2B), not a separate dedupe service.
 5. **Item-per-job model:** After `Parse Job Cards`, the pipeline behaves as a per-job processor despite a single-email trigger.
+6. **OpportunityKey drift risk:** Persistent dedupe reconstructs OpportunityKey from CRM columns; no dedicated sheet column — see §7.
 
 ---
 
