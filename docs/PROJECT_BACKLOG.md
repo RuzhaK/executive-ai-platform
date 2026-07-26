@@ -48,14 +48,14 @@ Use these statuses on every tracked item (commit, gate, or backlog ID):
 | Item | Value |
 |------|--------|
 | **Branch** | `emea-v1.1` |
-| **Commit** | `df37378c0c1d81a66eea4228bdea5045298e5e0f` — `feat(emea): finalize v1.1 with Preview threshold 5 and C4 runtime validation` |
+| **Commit** | `e59cf80` — `feat(emea): add Professional Fit stage before eligibility gates` |
 | **Workflow file** | `workflows/Executive-Job-CRM-v1.1-DEV.json` |
-| **Nodes / connections** | 58 / 70 |
+| **Nodes / connections** | 62 / 60 |
 | **PreviewScoreThreshold** | **5** (`Preview Score Job`) |
 | **VerifiedScoreThreshold** | **7** (unchanged) |
 | **Regression label** | `jobs-exec-crm-regression` |
 | **DEV spreadsheet** | `Executive Job CRM - EMEA DEV` (`1x_f_DK5yi3FprfIo2w1Pf1Q9VaAeUeMm66gOnR7igJs`) |
-| **EMEA v1.1 status** | **RELEASE BASELINE** — C4 runtime validated; ready to tag |
+| **EMEA v1.1 status** | **RELEASE BASELINE + Professional Fit** — C4 validated; PF stage shipped @ `e59cf80` |
 
 ### EMEA-C4 validation (2026-07-22)
 
@@ -119,10 +119,13 @@ Policy Engine → Check Language in Title
   FALSE → AI - Preview Score Job → …
 ```
 
-### Post-Extract pre-Verified chain (C6 + TRAVEL + C2 + C3 + C4)
+### Post-Extract pre-Verified chain (Professional Fit + C6 + TRAVEL + C2 + C3 + C4)
 
 ```
-Extract LinkedIn Job Description → Check Posting Closed
+Extract LinkedIn Job Description
+  → AI - Professional Fit
+  → Normalize Professional Fit
+  → Check Posting Closed
   TRUE  → Build Closed Posting Reject Record → Merge Final Records (input 1)
   FALSE → Mandatory Travel Gate → Check Mandatory Travel
             TRUE  → Build Mandatory Travel Reject Record → Merge Final Records (input 1)
@@ -134,6 +137,8 @@ Extract LinkedIn Job Description → Check Posting Closed
                                           TRUE  → Build Country List Remote Reject Record → Merge Final Records (input 1)
                                           FALSE → AI - Verified Review → Normalize Verified Review → …
 ```
+
+**NO_URL path:** bypasses Extract, Professional Fit, and all post-Extract gates → `Build No URL Preview Only Record`.
 
 ### Frozen (do not change without explicit approval)
 
@@ -265,6 +270,27 @@ Searched 2026-07-17 (prior REJECT reconstruction attempt):
 | DONE | `ee48c2a` | **EMEA-C3** — mandatory language gate (conservative skill-context) on `FullJobText`; **n8n validated** (`v25.xlsx` · PASS WITH EXPLANATION) |
 | DONE | `90d7a3c` | **EMEA-C4** — country-list remote / explicit eligibility gate on `FullJobText`; offline matrix 17/17 |
 | DONE | `df37378` | **EMEA v1.1 release** — `PreviewScoreThreshold = 5`; C4 BLOCK runtime validated (Airalo `4430353001`) |
+| DONE | *(see EMEA-PROFESSIONAL-FIT)* | **EMEA-PROFESSIONAL-FIT** — separate Professional Fit stage before eligibility; PF preservation through Verified normalize @ `e59cf80` |
+
+---
+
+### EMEA-PROFESSIONAL-FIT validation (2026-07-26)
+
+| Field | Value |
+|-------|--------|
+| **Backlog ID** | **EMEA-PROFESSIONAL-FIT** |
+| **Status** | **DONE** |
+| **Commit** | `e59cf80` |
+| **Workflow file** | `workflows/Executive-Job-CRM-v1.1-DEV.json` |
+| **Nodes added** | `AI - Professional Fit`, `Normalize Professional Fit` |
+| **Node modified** | `Normalize Verified Review` — restores six `ProfessionalFit*` fields from `$('Normalize Professional Fit').item?.json` |
+| **Nodes / connections (after)** | **62 / 60** |
+| **Prompt** | `docs/ProfessionalFitPrompt_v2.2.md` (embedded) |
+| **Methodology** | `docs/ProfessionalFitScoring.md` |
+| **Runtime status** | **PASS** — 10-job regression; no regressions observed |
+| **Validated behavior** | Professional Fit scores correctly; `ProfessionalFit*` survives through `Normalize Verified Review`; Verified Review unchanged; eligibility rejects preserve PF fields |
+| **Out of scope (this item)** | Google Sheets column mapping for `ProfessionalFit*` — see **EMEA-PF-SHEETS** |
+| **Regression config** | `TestMode=true`, `MaxJobCards=10`, enriched-path jobs |
 
 ---
 
@@ -288,7 +314,7 @@ Pre-Verified gate work from v17 reference. One commit per gate unless noted.
 **Target enrichment topology (after C4–C5):**
 
 ```
-Extract → Closed → Travel → Domain → Language → Country-list → Founder → AI - Verified Review
+Extract → Professional Fit → Closed → Travel → Domain → Language → Country-list → Founder → AI - Verified Review
 ```
 
 ### Known coverage ceiling — closed posting (C6)
@@ -338,6 +364,7 @@ Extract → Closed → Travel → Domain → Language → Country-list → Found
 
 | Status | ID | Item |
 |--------|-----|------|
+| OPEN | **EMEA-PF-SHEETS** | Map `ProfessionalFit*` fields to Google Sheets columns (separate enhancement; workflow item fields already populated) |
 | OPEN | **EMEA-OUTPUT-NORM** | Output-field normalization (runtime/sheet display vs internal gate fields) — governs field consistency **after** a decision is produced (deterministic or AI). **Independent of** CleverMatch repeatability (`4432338590`); related investigation only |
 | DONE | **EMEA-REGRESSION-FRAMEWORK** | Lightweight 7-phase lifecycle + Regression Catalog — seed `EMEA-TRAVEL-A` only; add cases incrementally after explicit n8n validation |
 | OPEN | **DOC-ARCH-REFRESH** | Refresh architecture docs: `WORKFLOW_ARCHITECTURE.md` must accurately reflect current EMEA v1.1 workflow (`Executive-Job-CRM-v1.1-DEV.json`, 51 nodes); `V1.1_ARCHITECTURE.md` clearly positioned as historical target design or updated appropriately. Audit 2026-07-17: WORKFLOW header/topology **partially stale** (documents 17-node path); V1.1 gap analysis **historical** vs as-built. Do not commit stale architecture as canonical without qualification or update. |
@@ -380,6 +407,7 @@ Stable, re-runnable cases with documented n8n validation. Not an execution archi
 | **EMEA-C3-N1** | EMEA-C3 | NEGATIVE | Head of e-commerce variants on same email | `PREVIEW_REJECT` before Extract; language gate not reached | `ee48c2a` · 2026-07-19 · Limit 1 (n8n) · workbook `Executive Job CRM - EMEA DEV v25.xlsx` | **PASS** |
 | **EMEA-C4-A** | EMEA-C4 | POSITIVE | Limit 50 regression @ `90d7a3c`; enriched rows traverse C4 PASS path (e.g. Provenir, Xapo, Kaderabotim) | No `COUNTRY_ELIGIBILITY`; post-extract gates fire as expected; Verified runs on pass-path jobs | `90d7a3c` · 2026-07-22 · Limit 50 (n8n) · workbook `Executive Job CRM - EMEA DEV v27.xlsx` | **PASS** |
 | **EMEA-C4-N1** | EMEA-C4 | NEGATIVE | Airalo / Strategy Director / JobId `4430353001`; TestEmailId `19f5f37ea77ea075`; `PreviewScore = 5` @ threshold **5** | Enrichment OK → `auto_reject_reason = COUNTRY_ELIGIBILITY`; `CountryEligibilityBlockType = REMOTE_COUNTRY_LIST`; `PipelineStage = FINAL_REJECT`; Verified skipped | `df37378` · 2026-07-22 · Limit 1 targeted (n8n) | **PASS** |
+| **EMEA-PF-A** | EMEA-PROFESSIONAL-FIT | POSITIVE | 10-job enriched-path regression @ `e59cf80`; `MaxJobCards=10` | All items have `ProfessionalFitScore`; PF fields survive `Normalize Verified Review`; Verified behavior unchanged; no regressions | `e59cf80` · 2026-07-26 · Limit 10 (n8n) | **PASS** |
 
 *Additional cases (e.g. C2.1 Fulchester domain, C6 controls, explicit language BLOCK corpus) — add only after explicit n8n regression validation.*
 

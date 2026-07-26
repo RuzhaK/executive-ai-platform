@@ -3,8 +3,8 @@
 **Workflow:** `Executive Job CRM v1.1 - Development`  
 **File:** `workflows/Executive-Job-CRM-v1.1-DEV.json`  
 **Status:** Inactive (`active: false`)  
-**Nodes:** 60  
-**Connections:** 72  
+**Nodes:** 62  
+**Connections:** 60 source keys  
 **Trigger:** Gmail poll (every minute, label-filtered; DEV harness overrides fetch selection)
 
 ---
@@ -27,7 +27,7 @@ The design is a **single linear pipeline with three rejection branches** that al
 | System | Role |
 |--------|------|
 | **Gmail** | Source of LinkedIn job alert emails (label: `Jobs/LinkedIn`) |
-| **OpenAI** | Three LLM calls: extraction, evaluation, verified review |
+| **OpenAI** | Four LLM calls: extraction, initial evaluation, professional fit (enriched path), verified review |
 | **Google Sheets** | CRM destination (`Executive Job CRM` → `Sheet1`) |
 | **n8n Code nodes** | Parsing, normalization, rejection record building |
 
@@ -107,7 +107,7 @@ flowchart TB
 | **2b. Persistent CRM dedupe (Commit 2B)** | Read CRM Existing JobIds → Filter New CRM JobIds | Load existing CRM rows once; drop parsed jobs already present by **JobId** and/or reconstructed **OpportunityKey** |
 | **2c. DEV card cap** | DEV - Cap Max Job Cards (+ injectors) | Limit job cards per run when `TestMode=true`; regression fixtures — not production logic |
 | **3. Gate** | Policy Engine, language/domain/travel/country gates, Preview threshold, location/validation | Deterministic filters before and between AI stages |
-| **4. Evaluate** | Preview AI → Initial → Verified (+ enrichment on verified path) | Tiered AI evaluation with FullJobText on verified path |
+| **4. Evaluate** | Preview AI → Initial → Professional Fit → Verified (+ enrichment on verified path) | Tiered AI evaluation; Professional Fit scores role quality before eligibility gates; FullJobText on verified path |
 | **5. Reject handling** | Build * Reject Record nodes | Standardize rejected jobs for CRM |
 | **6. Persist** | Merge → Normalize Output → Gate Append → Sheets → Wait | Append row; throttle with 4s delay |
 
@@ -431,13 +431,70 @@ On parse error: returns safe defaults (`InitialEvalScore: 0`, `InitialEvalRecomm
 | | |
 |---|---|
 | **Type** | `if` v2.3 |
-| **Purpose** | Decide whether a job warrants expensive verified review |
+| **Purpose** | Legacy/orphan gate — **not on active enriched path** (verified path uses post-enrichment eligibility gates) |
 | **Condition** | `7 <= InitialEvalScore` (i.e. **InitialEvalScore ≥ 7**) |
 
 | Branch | Route | Next node |
 |--------|-------|-----------|
 | **True** | High score | AI - Verified Review |
 | **False** | Low score | Build Reject Record |
+
+---
+
+### 5.11a AI - Professional Fit
+
+| | |
+|---|---|
+| **Type** | OpenAI LangChain v2.3 |
+| **Model** | `gpt-4.1-mini` |
+| **Purpose** | Score **Professional Fit** (role quality and alignment only) before eligibility gates |
+| **Prompt** | `docs/ProfessionalFitPrompt_v2.2.md` (embedded in node) |
+| **Inputs** | `Role`, `Company`, `FullJobText`, `Notes` from enriched job item |
+| **Outputs** | Raw OpenAI JSON response (replaces `$json` with AI envelope) |
+| **Options** | `maxTokens: 1200`; temperature `0`; JSON-only instruction |
+
+**Placement (enriched path only):**
+
+```
+Extract LinkedIn Job Description
+  → AI - Professional Fit
+  → Normalize Professional Fit
+  → Check Posting Closed
+  → [eligibility gates …]
+  → AI - Verified Review
+```
+
+The **NO_URL** preview-only path bypasses Professional Fit entirely.
+
+**Scope:** Role quality only. Does **not** evaluate location, eligibility, recommendation, or posting status. No rejection gate on `ProfessionalFitScore`.
+
+---
+
+### 5.11b Normalize Professional Fit
+
+| | |
+|---|---|
+| **Type** | `code` v2 (run once per item) |
+| **Purpose** | Parse Professional Fit AI JSON and merge `ProfessionalFit*` fields onto the existing job item |
+| **Inputs** | Professional Fit LLM response; cross-node context from `Normalize AI Evaluation` + `Extract LinkedIn Job Description` |
+| **Outputs** | Complete job item with Professional Fit fields added |
+
+**Adds fields (does not replace `Verified*` or overwrite eligibility fields):**
+
+| Workflow field | AI source |
+|----------------|-----------|
+| `ProfessionalFitScore` | `professional_fit_score` (0.0–10.0) |
+| `ProfessionalFitDimensionScores` | JSON string of eight `dimension_scores` keys |
+| `ProfessionalFitStrengths` | `primary_strengths` |
+| `ProfessionalFitGaps` | `primary_fit_gap` |
+| `ProfessionalFitReasoning` | `scoring_rationale` |
+| `ProfessionalFitError` | Internal only — set on JSON parse failure; empty on success |
+
+On parse failure: blank `ProfessionalFit*` fields + `ProfessionalFitError` message; upstream job fields preserved.
+
+**Downstream:** Eligibility gate Code nodes use `...$json` and preserve `ProfessionalFit*`. Verified AI replaces `$json`; `Normalize Verified Review` restores PF fields via `$('Normalize Professional Fit').item?.json`.
+
+**Google Sheets:** `ProfessionalFit*` fields are **not** mapped to sheet columns in the current workflow (separate future enhancement).
 
 ---
 
@@ -476,8 +533,16 @@ On parse error: returns safe defaults (`InitialEvalScore: 0`, `InitialEvalRecomm
 |---|---|
 | **Type** | `code` v2 (run once per item) |
 | **Purpose** | Parse verified AI JSON into verified-stage fields only |
-| **Inputs** | Verified review LLM response; merges with **Normalize AI Evaluation** item for job/email/preview context |
+| **Inputs** | Verified review LLM response; rebuilds job context from cross-node references |
 | **Outputs** | Complete CRM record (verified path) |
+
+**Cross-node context sources:**
+
+| Reference | Fields merged into `original` |
+|-----------|-------------------------------|
+| `$('Normalize AI Evaluation').item?.json` | Primary base — job, preview, initial eval, email metadata |
+| `$('Extract LinkedIn Job Description').item?.json` | Partial enrichment — `FullJobText`, `FullJobTextLength`, `EnrichmentStatus`, `EnrichmentError` |
+| `$('Normalize Professional Fit').item?.json` | Six explicit `ProfessionalFit*` assignments (not a full spread) |
 
 **Verified-stage fields (from verified AI only — no fallback to initial eval or preview):**
 
@@ -644,6 +709,21 @@ Scoring fields are **stage-owned**. No node overwrites another stage’s fields,
 
 **Rules:** Populated **only** when verified review executes. Empty string `''` on all other paths (preview reject, location reject, low initial score, etc.). Verified AI output only — no fallback to `InitialEvalScore` or `Preview*`.
 
+### Professional Fit stage (enriched path only)
+
+**Producer:** `AI - Professional Fit` → `Normalize Professional Fit`
+
+| Field | Description |
+|-------|-------------|
+| `ProfessionalFitScore` | Overall role-quality score (0.0–10.0) |
+| `ProfessionalFitDimensionScores` | JSON string — eight dimension subscores |
+| `ProfessionalFitStrengths` | Primary alignment strengths |
+| `ProfessionalFitGaps` | Primary fit gap |
+| `ProfessionalFitReasoning` | Scoring rationale |
+| `ProfessionalFitError` | Parse/error message; empty on success |
+
+**Rules:** Set once after Professional Fit AI on the enriched path. Preserved through eligibility gate rejects (`...$json`). Restored at `Normalize Verified Review` after Verified AI overwrites `$json`. **Not written to Google Sheets** in current schema. Does **not** replace or gate on `VerifiedScore`. Methodology: `docs/ProfessionalFitScoring.md`; prompt: `docs/ProfessionalFitPrompt_v2.2.md`.
+
 ### Google Sheets `Score` (final column)
 
 Computed at **Append to Google Sheets** only:
@@ -728,6 +808,8 @@ The following stages add fields on the item before append (unchanged by Commit 2
 + { PreviewScore, PreviewRecommendation, PreviewReason, PreviewRisk, PreviewCV }
     ↓  [AI initial evaluation + normalize]
 + { InitialEvalScore, InitialEvalRecommendation, InitialEvalCV, … }
+    ↓  [enriched path — HTTP + Extract + Professional Fit]
++ { FullJobText, EnrichmentStatus, ProfessionalFitScore, ProfessionalFitDimensionScores, … }
     ↓  [verified path only]
 + { VerifiedScore, VerifiedRecommendation, FinalCV, FinalDecision, … }
     ↓  [reject paths]
