@@ -14,11 +14,12 @@ The **Bulgaria (BG)** workflow is in production at v1.1.2. The **EMEA** workflow
 
 | Track | Status |
 |-------|--------|
-| **Production workflow** | BG v1.1.2 — `workflows/Executive_Job_CRM_BG_v1.1.2_PRODUCTION.json` |
+| **BG production** | v1.1.2 — `workflows/Executive_Job_CRM_BG_v1.1.2_PRODUCTION.json` |
 | **BG dev working file** | `workflows/Executive_Job_CRM_v1.1_BG_ONLY.json` |
-| **Development** | EMEA workflow — `workflows/Executive-Job-CRM-v1.1-DEV.json` |
+| **EMEA production** | v1.1.1 — `workflows/Executive-Job-CRM-v1.1-PRODUCTION.json` (branch `emea-v1.1`, tag `emea-v1.1.1`) |
+| **EMEA development** | `workflows/Executive-Job-CRM-v1.1-DEV.json` (branch `emea-dev`) |
 
-BG v1.1.2 is the frozen production baseline for Bulgaria-eligible roles (Sofia / Remote Bulgaria). EMEA work proceeds independently; BG calibration principles may be ported selectively.
+BG v1.1.2 is the frozen production baseline for Bulgaria-eligible roles. EMEA v1.1.1 is the frozen production baseline for the EMEA pipeline (includes Professional Fit). New EMEA features are developed on `emea-dev` and promoted to production only after regression, documentation, and approval.
 
 ---
 
@@ -57,7 +58,8 @@ executive-ai-platform/
 |------|------|
 | `Executive_Job_CRM_BG_v1.1.2_PRODUCTION.json` | BG production import |
 | `Executive_Job_CRM_v1.1_BG_ONLY.json` | BG development |
-| `Executive-Job-CRM-v1.1-DEV.json` | EMEA development |
+| `Executive-Job-CRM-v1.1-PRODUCTION.json` | EMEA production import (branch `emea-v1.1`) |
+| `Executive-Job-CRM-v1.1-DEV.json` | EMEA development (branch `emea-dev`) |
 
 ---
 

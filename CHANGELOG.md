@@ -62,3 +62,12 @@ Preview calibration and output-contract commits on `Executive-Job-CRM-v1.1-DEV.j
 - **Future work (backlog only):** `EMEA-PREVIEW-CALIBRATION` — evaluate thresholds 5/6/7 on larger datasets; improve Preview scoring for strategy/director roles without materially increasing enrichment cost
 
 **Current validated baseline:** `df37378c0c1d81a66eea4228bdea5045298e5e0f` (ready to tag as EMEA v1.1)
+
+## EMEA v1.1.1 — Professional Fit + dual-track (2026-07-27)
+
+- **Professional Fit stage** — `AI - Professional Fit` + `Normalize Professional Fit` before eligibility; PF preservation in `Normalize Verified Review`
+- **Regression:** 10-job PASS @ `e59cf80` (EMEA-PF-A)
+- **Dual-track:** branch `emea-v1.1` (production) + branch `emea-dev` (active development)
+- **Production import:** `workflows/Executive-Job-CRM-v1.1-PRODUCTION.json` · tag `emea-v1.1.1`
+- **Development import:** `workflows/Executive-Job-CRM-v1.1-DEV.json` on `emea-dev`
+- **Topology:** 62 nodes / 60 connections

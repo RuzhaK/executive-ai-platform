@@ -1,10 +1,11 @@
 # Project Backlog
 
-Executive Opportunity Intelligence Platform — EMEA dev pipeline (`emea-v1.1`).
+Executive Opportunity Intelligence Platform — EMEA dual-track pipeline.
 
-**Source of truth:** `workflows/Executive-Job-CRM-v1.1-DEV.json`  
+**Production branch:** `emea-v1.1` · import `workflows/Executive-Job-CRM-v1.1-PRODUCTION.json`  
+**Development branch:** `emea-dev` · edit `workflows/Executive-Job-CRM-v1.1-DEV.json`  
 **Architecture reference:** `docs/architecture/WORKFLOW_ARCHITECTURE.md`  
-**Engineering rules:** `docs/PROJECT_RULES.md`
+**Engineering rules:** `docs/PROJECT_RULES.md` (§1 EMEA dual-track)
 
 ## Repository and backlog rules
 
@@ -45,17 +46,33 @@ Use these statuses on every tracked item (commit, gate, or backlog ID):
 
 ## Current Baseline
 
+### Production (`emea-v1.1`)
+
 | Item | Value |
 |------|--------|
 | **Branch** | `emea-v1.1` |
-| **Commit** | `e59cf80` — `feat(emea): add Professional Fit stage before eligibility gates` |
-| **Workflow file** | `workflows/Executive-Job-CRM-v1.1-DEV.json` |
+| **Tag** | `emea-v1.1.1` (Professional Fit milestone) |
+| **Workflow commit** | `e59cf80` — `feat(emea): add Professional Fit stage before eligibility gates` |
+| **Docs commit** | `e9f23bc` — PF validation recorded |
+| **Import file** | `workflows/Executive-Job-CRM-v1.1-PRODUCTION.json` |
 | **Nodes / connections** | 62 / 60 |
-| **PreviewScoreThreshold** | **5** (`Preview Score Job`) |
-| **VerifiedScoreThreshold** | **7** (unchanged) |
+| **PreviewScoreThreshold** | **5** |
+| **VerifiedScoreThreshold** | **7** |
 | **Regression label** | `jobs-exec-crm-regression` |
 | **DEV spreadsheet** | `Executive Job CRM - EMEA DEV` (`1x_f_DK5yi3FprfIo2w1Pf1Q9VaAeUeMm66gOnR7igJs`) |
-| **EMEA v1.1 status** | **RELEASE BASELINE + Professional Fit** — C4 validated; PF stage shipped @ `e59cf80` |
+| **Status** | **PRODUCTION BASELINE** — import PRODUCTION JSON into live EMEA n8n; do not edit in place |
+
+### Development (`emea-dev`)
+
+| Item | Value |
+|------|--------|
+| **Branch** | `emea-dev` |
+| **Starting point** | Same as production baseline @ `e9f23bc` (forked when dual-track established) |
+| **Working file** | `workflows/Executive-Job-CRM-v1.1-DEV.json` |
+| **Policy** | All new EMEA features implemented and tested here only |
+| **Promotion** | Regression + docs + approval → merge to `emea-v1.1` → refresh PRODUCTION snapshot → tag |
+
+**Regression baseline for future EMEA work:** workflow **`e59cf80`**, branch **`emea-dev`**.
 
 ### EMEA-C4 validation (2026-07-22)
 

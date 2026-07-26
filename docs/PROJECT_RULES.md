@@ -14,10 +14,37 @@ Engineering rules for the **Executive Opportunity Intelligence Platform** (n8n /
 
 ### Development workflow files
 
-- **EMEA / main dev:** all development in **`workflows/Executive-Job-CRM-v1.1-DEV.json`** only.
+- **EMEA production import:** **`workflows/Executive-Job-CRM-v1.1-PRODUCTION.json`** — frozen baseline for the live EMEA n8n instance. Updated **only** when a change is promoted from development (regression + documentation + approval).
+- **EMEA active development:** **`workflows/Executive-Job-CRM-v1.1-DEV.json`** — all new EMEA features and experiments. Edit **only** on branch **`emea-dev`**.
 - **BG-only dev:** all development in **`workflows/Executive_Job_CRM_v1.1_BG_ONLY.json`** only.
 - Do not treat older exports (`v1.0.0`, `FIX*` snapshots, BG `rc*` snapshots, etc.) as active development targets unless explicitly archiving or comparing history.
-- Production should track a separate, explicitly promoted export (e.g. a tagged release), not the dev file while it is in flux.
+
+### EMEA dual-track (production vs development)
+
+EMEA uses **two Git branches** and **two workflow artifacts** so live job processing is never blocked by in-flight development.
+
+| Track | Git branch | Workflow file | n8n instance | Change policy |
+|-------|------------|---------------|--------------|---------------|
+| **Production** | `emea-v1.1` | `Executive-Job-CRM-v1.1-PRODUCTION.json` | Production EMEA CRM | **Frozen.** No direct edits. Receives changes only via approved promotion from `emea-dev`. |
+| **Development** | `emea-dev` | `Executive-Job-CRM-v1.1-DEV.json` | Dev / regression EMEA CRM | **Active.** All new features, gates, prompts, and schema experiments start here. |
+
+**Promotion path (dev → production):**
+
+1. Backlog item **DONE** on `emea-dev` (Limit 1 → 10 → 50 regression passed).
+2. Documentation updated on `emea-dev`.
+3. Explicit approval to promote.
+4. Merge (or cherry-pick) workflow commit(s) to `emea-v1.1`.
+5. Copy validated `Executive-Job-CRM-v1.1-DEV.json` → `Executive-Job-CRM-v1.1-PRODUCTION.json` on `emea-v1.1`.
+6. Tag release on `emea-v1.1`; import **PRODUCTION** JSON into the production n8n instance.
+
+**Rules:**
+
+- Never edit `Executive-Job-CRM-v1.1-PRODUCTION.json` on `emea-dev` during normal feature work.
+- Never develop new features directly on `emea-v1.1`.
+- Production n8n must import **PRODUCTION** JSON only; dev n8n imports **DEV** JSON only.
+- Hotfixes: implement on `emea-dev`, regression-test, then promote — same path as features.
+
+**Current production baseline:** tag `emea-v1.1.1` · workflow commit `e59cf80` · 62 nodes / 60 connections (includes Professional Fit stage).
 
 ### BG-only RC snapshots
 
@@ -124,7 +151,7 @@ Refer to `docs/architecture/WORKFLOW_ARCHITECTURE.md` for the current field mode
 
 ## 6. Quick Checklist (before merge / promote)
 
-- [ ] Change made only in the correct working file (`Executive-Job-CRM-v1.1-DEV.json` or `Executive_Job_CRM_v1.1_BG_ONLY.json`), not production or RC snapshots
+- [ ] Change made only in the correct working file — EMEA: **`Executive-Job-CRM-v1.1-DEV.json` on `emea-dev`**; BG: **`Executive_Job_CRM_v1.1_BG_ONLY.json`**; never edit PRODUCTION or RC snapshots in place
 - [ ] BG-only: RC snapshot created when required (see §1 BG-only RC snapshots)
 - [ ] Tested at Limit = 1, then 10, then 50 (functional changes)
 - [ ] Google Sheets schema unchanged, or migration documented
