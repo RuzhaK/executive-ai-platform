@@ -477,6 +477,7 @@ When `EnrichmentStatus` is not `OK` or `FullJobTextLength < 200`, deterministic 
 | **D. Fulchester (when stub)** | JobId `4434499750`; guest stub with markers | `FINAL_REJECT` before Verified |
 | **E. NO_URL path** | Missing/invalid URL | No HTTP; C6 skipped |
 | **F. HTTP error** | 403 / 429 / empty body | C6 fail-open |
+| **H. HTTP 404/410 not found** | Guest API returns 404 or 410 (JobId e.g. `3800000001` historical backfill) | `FINAL_REJECT` via closed-posting path; `auto_reject_reason: CLOSED_POSTING`; batch continues; **Professional Fit skipped** (zero PF tokens) |
 | **G. C2 integrity** | Mill `4436662085` mandatory domain | Unchanged downstream behavior when C6 does not fire |
 
 ### Mandatory-language gate (EMEA-C3 — `ee48c2a611d55c3a13224bbd229821941a6bc26f` validated)
