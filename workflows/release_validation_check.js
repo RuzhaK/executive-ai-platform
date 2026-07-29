@@ -3,14 +3,22 @@ const { execSync } = require('child_process');
 const path = require('path');
 
 const root = path.join(__dirname, '..');
-const cur = JSON.parse(fs.readFileSync(path.join(__dirname, 'Executive-Job-CRM-v1.1-STABLE.json'), 'utf8'));
-const head = JSON.parse(
-  execSync('git show HEAD:workflows/Executive-Job-CRM-v1.1-DEV.json', { cwd: root, encoding: 'utf8' }),
+const PRE_RELEASE_BASELINE_COMMIT = '0f966c8';
+const stablePath = path.join(__dirname, 'Executive-Job-CRM-v1.1-STABLE.json');
+
+const cur = JSON.parse(fs.readFileSync(stablePath, 'utf8'));
+const baseline = JSON.parse(
+  execSync(
+    `git show ${PRE_RELEASE_BASELINE_COMMIT}:workflows/Executive-Job-CRM-v1.1-DEV.json`,
+    { cwd: root, encoding: 'utf8' },
+  ),
 );
 
 const get = (wf, n) => wf.nodes.find((x) => x.name === n)?.parameters?.jsCode || '';
-const h = get(head, 'Normalize Output Record');
-const c = get(cur, 'Normalize Output Record');
+const baselineNorm = get(baseline, 'Normalize Output Record');
+const curNorm = get(cur, 'Normalize Output Record');
+
+console.log(`Comparing STABLE vs pre-release baseline ${PRE_RELEASE_BASELINE_COMMIT}`);
 
 for (const r of [
   'WORK_AUTHORIZATION_REQUIRED',
@@ -19,11 +27,11 @@ for (const r of [
   'VERIFIED_PARSE_ERROR',
   'safeSheetText',
 ]) {
-  console.log(`${r}: HEAD=${h.includes(r)} CUR=${c.includes(r)}`);
+  console.log(`${r}: baseline=${baselineNorm.includes(r)} STABLE=${curNorm.includes(r)}`);
 }
 
 const vc = get(cur, 'Normalize Verified Review');
-console.log(`VerifiedScore: 0 in CUR=${vc.includes('VerifiedScore: 0')}`);
+console.log(`VerifiedScore: 0 in STABLE=${vc.includes('VerifiedScore: 0')}`);
 console.log(`VERIFIED_PARSE_ERROR in verified=${vc.includes('VERIFIED_PARSE_ERROR')}`);
 
 const nodeExe = path.join(__dirname, '.tools/node/node.exe');

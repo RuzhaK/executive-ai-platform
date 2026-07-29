@@ -1,7 +1,7 @@
 # Executive Job CRM v1.1 — Workflow Architecture
 
-**Workflow:** `Executive Job CRM v1.1 - Development`  
-**File:** `workflows/Executive-Job-CRM-v1.1-DEV.json`  
+**Workflow:** `Executive Job CRM v1.1 - STABLE`
+**File:** `workflows/Executive-Job-CRM-v1.1-STABLE.json` (frozen @ tag `v1.1-stable`; architecture body below reflects earlier 62-node as-built — see `docs/v1.1_FINAL_REVIEW.md` for 65-node STABLE)
 **Status:** Inactive (`active: false`)  
 **Nodes:** 62  
 **Connections:** 60 source keys  
@@ -877,4 +877,4 @@ These values are **hardcoded in the export** and are environment-specific:
 
 ---
 
-*Generated from `workflows/Executive-Job-CRM-v1.1-DEV.json`.*
+*Architecture body generated from pre-stable EMEA export; canonical v1.1 import: `workflows/Executive-Job-CRM-v1.1-STABLE.json`.*

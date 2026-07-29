@@ -6,7 +6,7 @@
 
 The project is implemented as **n8n workflow-as-code** (JSON exports + documentation), not a conventional application. Each job passes through extraction, Preview screening, policy gates, and Verified evaluation before a CRM row is appended with score, recommendation, CV, interview probability, and reject rationale.
 
-The **Bulgaria (BG)** workflow is in production at v1.1.2. The **EMEA** workflow is under separate active development.
+The **Bulgaria (BG)** workflow is in production at v1.1.2. **Executive Job CRM EMEA v1.1** is released and frozen at tag `v1.1-stable`. Future EMEA work belongs to **Executive Opportunity Intelligence (v2)**.
 
 ---
 
@@ -16,10 +16,10 @@ The **Bulgaria (BG)** workflow is in production at v1.1.2. The **EMEA** workflow
 |-------|--------|
 | **BG production** | v1.1.2 — `workflows/Executive_Job_CRM_BG_v1.1.2_PRODUCTION.json` |
 | **BG dev working file** | `workflows/Executive_Job_CRM_v1.1_BG_ONLY.json` |
-| **EMEA production** | v1.1.1 — `workflows/Executive-Job-CRM-v1.1-PRODUCTION.json` (branch `emea-v1.1`, tag `emea-v1.1.1`) |
-| **EMEA development** | `workflows/Executive-Job-CRM-v1.1-DEV.json` (branch `emea-dev`) |
+| **EMEA v1.1 stable (frozen)** | `workflows/Executive-Job-CRM-v1.1-STABLE.json` — tag `v1.1-stable` @ `862e423` (branch `emea-dev`) |
+| **EMEA production snapshot** | v1.1.1 — `workflows/Executive-Job-CRM-v1.1-PRODUCTION.json` (branch `emea-v1.1`, tag `emea-v1.1.1`) |
 
-BG v1.1.2 is the frozen production baseline for Bulgaria-eligible roles. EMEA v1.1.1 is the frozen production baseline for the EMEA pipeline (includes Professional Fit). New EMEA features are developed on `emea-dev` and promoted to production only after regression, documentation, and approval.
+BG v1.1.2 is the frozen production baseline for Bulgaria-eligible roles. **EMEA v1.1 is frozen** — import `Executive-Job-CRM-v1.1-STABLE.json` for the canonical v1.1 pipeline (Pre-PF gate, BUG-001/BUG-002 resolved). Planned enhancements move to **Executive Opportunity Intelligence (v2)**; do not extend v1.1 with new features.
 
 ---
 
@@ -58,8 +58,8 @@ executive-ai-platform/
 |------|------|
 | `Executive_Job_CRM_BG_v1.1.2_PRODUCTION.json` | BG production import |
 | `Executive_Job_CRM_v1.1_BG_ONLY.json` | BG development |
-| `Executive-Job-CRM-v1.1-PRODUCTION.json` | EMEA production import (branch `emea-v1.1`) |
-| `Executive-Job-CRM-v1.1-DEV.json` | EMEA development (branch `emea-dev`) |
+| `Executive-Job-CRM-v1.1-STABLE.json` | EMEA v1.1 stable import (frozen — tag `v1.1-stable`) |
+| `Executive-Job-CRM-v1.1-PRODUCTION.json` | EMEA production snapshot (branch `emea-v1.1`) |
 
 ---
 
@@ -70,6 +70,7 @@ executive-ai-platform/
 | [docs/BG_CALIBRATION_PRINCIPLES.md](docs/BG_CALIBRATION_PRINCIPLES.md) | Executive scoring principles for BG and EMEA porting |
 | [docs/BG_v1.1.2_RELEASE_NOTES.md](docs/BG_v1.1.2_RELEASE_NOTES.md) | BG v1.1.2 production release summary |
 | [docs/BG_WORKFLOW_ARCHITECTURE.md](docs/BG_WORKFLOW_ARCHITECTURE.md) | BG v1.1.2 technical architecture |
+| [docs/v1.1_FINAL_REVIEW.md](docs/v1.1_FINAL_REVIEW.md) | EMEA v1.1 stable release sign-off |
 | [CHANGELOG.md](CHANGELOG.md) | Project version history |
 
 Additional references: [docs/PROJECT_RULES.md](docs/PROJECT_RULES.md), [docs/architecture/WORKFLOW_ARCHITECTURE.md](docs/architecture/WORKFLOW_ARCHITECTURE.md), [AGENTS.md](AGENTS.md).
@@ -80,9 +81,9 @@ Additional references: [docs/PROJECT_RULES.md](docs/PROJECT_RULES.md), [docs/arc
 
 ### Near-term
 
-- **EMEA workflow** — production-ready multi-country pipeline
-- **Shared calibration** — port BG principles where region-agnostic
-- **Parser improvements** — subject fallback and location edge cases
+- **Executive Opportunity Intelligence (v2)** — company-centric discovery and remote-first employer intelligence
+- **Shared calibration** — port BG principles where region-agnostic (v2 scope)
+- **Parser improvements** — subject fallback and location edge cases (v2 scope)
 
 ### Long-term
 
@@ -93,4 +94,4 @@ Additional references: [docs/PROJECT_RULES.md](docs/PROJECT_RULES.md), [docs/arc
 
 ---
 
-*BG v1.1.2 in production · EMEA in development*
+*BG v1.1.2 in production · EMEA v1.1 frozen at `v1.1-stable` · v2 in planning*

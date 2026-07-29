@@ -234,7 +234,7 @@ Scoring behavior changes belong in calibration docs and require a new versioned 
 |----------|------|
 | Production workflow | `workflows/Executive_Job_CRM_BG_v1.1.2_PRODUCTION.json` |
 | Dev working file | `workflows/Executive_Job_CRM_v1.1_BG_ONLY.json` |
-| EMEA / main dev (separate) | `workflows/Executive-Job-CRM-v1.1-DEV.json` |
+| EMEA v1.1 stable (separate) | `workflows/Executive-Job-CRM-v1.1-STABLE.json` |
 
 If this document and the production JSON disagree, the **production workflow JSON** is authoritative until reconciled.
 

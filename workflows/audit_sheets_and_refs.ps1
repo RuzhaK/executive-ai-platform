@@ -1,7 +1,8 @@
-$curPath = Join-Path $PSScriptRoot 'Executive-Job-CRM-v1.1-DEV.json'
+$curPath = Join-Path $PSScriptRoot 'Executive-Job-CRM-v1.1-STABLE.json'
+$PRE_RELEASE_BASELINE_COMMIT = '0f966c8'
+$headJson = git -C (Split-Path $PSScriptRoot -Parent) show "${PRE_RELEASE_BASELINE_COMMIT}:workflows/Executive-Job-CRM-v1.1-DEV.json" 2>$null
+if (-not $headJson) { Write-Host "Pre-release baseline unavailable ($PRE_RELEASE_BASELINE_COMMIT)"; exit 1 }
 $cur = Get-Content -Raw -Path $curPath | ConvertFrom-Json
-$headJson = git -C (Split-Path $PSScriptRoot -Parent) show HEAD:workflows/Executive-Job-CRM-v1.1-DEV.json 2>$null
-if (-not $headJson) { Write-Host 'HEAD unavailable'; exit 1 }
 $head = $headJson | ConvertFrom-Json
 
 function Get-AppendCols($wf) {
@@ -45,9 +46,9 @@ Write-Host "Check Mandatory Language IF: $($checkML.parameters.conditions.condit
 
 $headNorm = ($head.nodes | Where-Object { $_.name -eq 'Normalize Output Record' }).parameters.jsCode
 $curNorm = ($cur.nodes | Where-Object { $_.name -eq 'Normalize Output Record' }).parameters.jsCode
-Write-Host "Normalize code identical to HEAD: $($headNorm -eq $curNorm)"
+Write-Host "Normalize code identical to baseline ($PRE_RELEASE_BASELINE_COMMIT): $($headNorm -eq $curNorm)"
 if ($headNorm -ne $curNorm) {
-  Write-Host "Normalize length HEAD=$($headNorm.Length) CUR=$($curNorm.Length)"
+  Write-Host "Normalize length baseline=$($headNorm.Length) STABLE=$($curNorm.Length)"
   $added = @('WORK_AUTHORIZATION_REQUIRED','COUNTRY_RESIDENCY_REQUIRED','COUNTRY_REMOTE_ONLY')
   foreach ($a in $added) {
     Write-Host "  $a in CUR terminal list: $($curNorm.Contains($a))"

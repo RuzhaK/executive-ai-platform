@@ -1,4 +1,4 @@
-$wf = Get-Content 'c:\Users\Ru\Documents\RUZHA\CV\GitHub\executive-ai-platform\workflows\Executive-Job-CRM-v1.1-DEV.json' -Raw | ConvertFrom-Json
+$wf = Get-Content (Join-Path $PSScriptRoot 'Executive-Job-CRM-v1.1-STABLE.json') -Raw | ConvertFrom-Json
 $n = $wf.nodes | Where-Object { $_.name -eq 'Pre-PF Eligibility Gate' }
 $code = $n.parameters.jsCode
 $need = @(

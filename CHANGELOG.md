@@ -71,3 +71,14 @@ Preview calibration and output-contract commits on `Executive-Job-CRM-v1.1-DEV.j
 - **Production import:** `workflows/Executive-Job-CRM-v1.1-PRODUCTION.json` · tag `emea-v1.1.1`
 - **Development import:** `workflows/Executive-Job-CRM-v1.1-DEV.json` on `emea-dev`
 - **Topology:** 62 nodes / 60 connections
+
+## EMEA v1.1-stable — frozen release (2026-07-29)
+
+- **Release commit:** `862e4236606c743014a6a793fb04c266ee4579ac`
+- **Release tag:** `v1.1-stable`
+- **Canonical import:** `workflows/Executive-Job-CRM-v1.1-STABLE.json` (65 nodes; Pre-PF gate)
+- **Bug fixes:** **BUG-001** — `Company`/`Role` coerced to safe strings in `Normalize Output Record` before Google Sheets append; **BUG-002** — Verified AI invalid JSON routes to `VERIFIED_PARSE_ERROR` / `FINAL_REJECT` (no misleading `VerifiedScore = 0`)
+- **Google Sheets schema:** unchanged at **51 columns**
+- **Runtime validation:** completed in n8n (Limit 1 and Limit 10)
+- **Status:** **frozen** — future EMEA development belongs to **Executive Opportunity Intelligence (v2)**; v1.1 changes limited to emergency bug fixes only
+- **Release document:** `docs/v1.1_FINAL_REVIEW.md`

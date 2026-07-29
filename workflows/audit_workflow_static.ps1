@@ -1,5 +1,5 @@
 $ErrorActionPreference = 'Stop'
-$path = Join-Path (Split-Path -Parent $MyInvocation.MyCommand.Path) 'Executive-Job-CRM-v1.1-DEV.json'
+$path = Join-Path (Split-Path -Parent $MyInvocation.MyCommand.Path) 'Executive-Job-CRM-v1.1-STABLE.json'
 $wf = Get-Content -Raw -Path $path | ConvertFrom-Json
 
 $nodeNames = @()
