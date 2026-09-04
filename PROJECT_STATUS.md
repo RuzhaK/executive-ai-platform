@@ -15,20 +15,29 @@ Automated intake, filtering, scoring, and CRM storage of executive job opportuni
 
 ## Executive Job CRM EMEA
 
-**Status:** Released and Frozen
+**Status:** Production (patch release) — v1.1 line frozen except emergency bug fixes
 
-**Release:**
+**Current production release:**
 
-- **Version:** v1.1-stable
-- **Release commit:** 862e423
-- **Canonical workflow:** `workflows/Executive-Job-CRM-v1.1-STABLE.json`
+- **Version:** `v1.1.1-stable`
+- **Canonical workflow:** `workflows/Executive-Job-CRM-v1.1.1-STABLE.json` (73 nodes)
+- **Runtime validation:** completed successfully in n8n (execution **#1445**)
+- **Published in n8n** after validation
+- **BUG-003 fix:** production Gmail fetch uses the exact trigger Gmail message ID (`config.id`) via `fetchMode='byEmailId'` — no Get Many re-query in production
+
+**Historical frozen baseline:**
+
+- **Version:** `v1.1-stable`
+- **Release commit:** `862e423`
+- **Canonical workflow:** `workflows/Executive-Job-CRM-v1.1-STABLE.json` (65 nodes)
+- **Do not move or overwrite** tag `v1.1-stable` or the frozen STABLE export
 
 **Maintenance policy:**
 
-- Do not modify the frozen STABLE workflow for feature development.
-- Only emergency bug fixes are allowed.
-- Any emergency fix requires a new commit, validation, and a new patch release tag.
-- Do not move or rewrite tag `v1.1-stable`.
+- Do not modify v1.1 workflows for feature development, calibration, or new gates.
+- Only emergency bug fixes are allowed on the v1.1 line.
+- Any emergency fix requires validation in n8n, a new commit, and a new patch release tag (not a retag of `v1.1-stable`).
+- Future EMEA capability belongs to **Executive Opportunity Intelligence (v2)** — do not build v2 inside v1.1 exports.
 
 ## Executive Opportunity Intelligence
 

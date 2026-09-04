@@ -82,3 +82,14 @@ Preview calibration and output-contract commits on `Executive-Job-CRM-v1.1-DEV.j
 - **Runtime validation:** completed in n8n (Limit 1 and Limit 10)
 - **Status:** **frozen** — future EMEA development belongs to **Executive Opportunity Intelligence (v2)**; v1.1 changes limited to emergency bug fixes only
 - **Release document:** `docs/v1.1_FINAL_REVIEW.md`
+
+## EMEA v1.1.1-stable — Production Gmail Fetch Fix (2026-09-04)
+
+- **BUG-003:** Production `TestMode=false` no longer performs a Gmail Get Many re-query
+- **Build Gmail Fetch Plan** uses the exact Gmail Trigger `config.id` and emits `fetchMode='byEmailId'`
+- **Switch Gmail Fetch Mode** routes `byEmailId` to **Gmail - Get Email By ID (DEV)** (existing path; no new nodes)
+- **No production fallback:** if the trigger message ID is missing, the workflow fails explicitly with `PRODUCTION_TRIGGER_MESSAGE_ID_MISSING` — no Get Many or search fallback
+- **Runtime validation (n8n):** `TestMode=false` → Build Gmail Fetch Plan → `byEmailId` → Switch → ByEmailId → Gmail Get Email By ID → exactly one email → AI - Extract Job Cards → 1 input item → full workflow completed successfully (**execution #1445**, 10.677s)
+- **Published in n8n** after validation
+- **Canonical release artifact:** `workflows/Executive-Job-CRM-v1.1.1-STABLE.json` (73 nodes)
+- **Historical baseline:** tag `v1.1-stable` and `workflows/Executive-Job-CRM-v1.1-STABLE.json` remain frozen — do not move or overwrite
